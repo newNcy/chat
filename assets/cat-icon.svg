@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 耳朵（画在脸下层） -->
+  <path d="M30,52 L14,14 L54,32 Z" fill="#8b5cf6"/>
+  <path d="M98,52 L114,14 L74,32 Z" fill="#8b5cf6"/>
+  <!-- 内耳（浅紫） -->
+  <path d="M31,45 L22,22 L45,33 Z" fill="#c4b5fd"/>
+  <path d="M97,45 L106,22 L83,33 Z" fill="#c4b5fd"/>
+  <!-- 脸 -->
+  <circle cx="64" cy="74" r="42" fill="#8b5cf6"/>
+  <!-- 闭眼微笑（白色弧线） -->
+  <path d="M42,68 Q48,76 54,68" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M74,68 Q80,76 86,68" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- 鼻子（浅紫小三角） -->
+  <path d="M60,81 L68,81 L64,87 Z" fill="#c4b5fd"/>
+  <!-- 嘴（w 形微笑） -->
+  <path d="M56,91 Q60,96 64,91 Q68,96 72,91" stroke="#ffffff" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+</svg>
