@@ -266,13 +266,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   // ------- 会话操作 -------
   const newConversation = React.useCallback(() => {
-    // 新对话使用默认设置（不继承当前对话的设置）
+    // 新对话完全使用出厂默认设置（默认头像、无预设任何信息）
     const conv: Conversation = {
       id: uid(),
       title: "新对话",
       messages: [],
       configId: currentConfigId ?? undefined,
-      preferences: { ...defaultPreferences },
+      preferences: { ...DEFAULT_PREFERENCES },
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -280,12 +280,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     persistConversations(next);
     setCurrentConversationId(conv.id);
     return conv;
-  }, [
-    conversations,
-    currentConfigId,
-    defaultPreferences,
-    persistConversations,
-  ]);
+  }, [conversations, currentConfigId, persistConversations]);
 
   const selectConversation = React.useCallback((id: string) => {
     setCurrentConversationId(id);
