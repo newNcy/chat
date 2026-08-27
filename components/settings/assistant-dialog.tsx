@@ -63,11 +63,23 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // 失焦即保存（带脏检查，避免无变化时多余写入）
+  const commitAiName = () => {
+    const clean = name.trim() || "AI";
+    if (clean !== preferences.aiName) {
+      updatePreferences({ aiName: clean });
+    }
+  };
+
+  const commitPrompt = () => {
+    if (prompt !== preferences.systemPrompt) {
+      updatePreferences({ systemPrompt: prompt });
+    }
+  };
+
   const commit = () => {
-    updatePreferences({
-      aiName: name.trim() || "AI",
-      systemPrompt: prompt,
-    });
+    commitAiName();
+    commitPrompt();
   };
 
   const closeWithCommit = () => {
@@ -192,6 +204,13 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
               placeholder="AI"
               maxLength={30}
               onChange={(e) => setName(e.target.value)}
+              onBlur={commitAiName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               autoComplete="off"
             />
           </div>
@@ -343,6 +362,7 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
                 id="ai-prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                onBlur={commitPrompt}
                 placeholder={
                   "例如：\n你是一位专业的编程助手，回答简洁准确，默认使用中文。"
                 }
