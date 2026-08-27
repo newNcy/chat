@@ -42,15 +42,24 @@ export function ApiConfigForm({
   const [testing, setTesting] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
+  // 已自动获取过的 URL+Token 组合（避免重复请求）
+  const autoFetchedRef = React.useRef<string>("");
+
   const canSubmit = name.trim() && baseURL.trim() && apiKey.trim() && model.trim();
 
-  const handleRefreshModels = async () => {
+  /**
+   * 获取模型列表
+   * @param silent 静默模式（自动检测触发）：失败不弹提示，避免打断输入
+   */
+  const doFetchModels = async (silent: boolean) => {
     if (!baseURL.trim() || !apiKey.trim()) {
-      toast({
-        variant: "error",
-        title: "无法获取模型",
-        description: "请先填写 Base URL 和 API Token。",
-      });
+      if (!silent) {
+        toast({
+          variant: "error",
+          title: "无法获取模型",
+          description: "请先填写 Base URL 和 API Token。",
+        });
+      }
       return;
     }
     setRefreshing(true);
@@ -65,13 +74,15 @@ export function ApiConfigForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({
-          variant: "error",
-          title: data?.error?.title ?? "获取模型失败",
-          description:
-            (data?.error?.message ?? "无法获取模型列表。") +
-            "\n你仍可以手动输入 Model。",
-        });
+        if (!silent) {
+          toast({
+            variant: "error",
+            title: data?.error?.title ?? "获取模型失败",
+            description:
+              (data?.error?.message ?? "无法获取模型列表。") +
+              "\n你仍可以手动输入 Model。",
+          });
+        }
         return;
       }
       const list: string[] = data.models ?? [];
@@ -79,19 +90,42 @@ export function ApiConfigForm({
       if (list.length > 0 && !model) setModel(list[0]);
       toast({
         variant: "success",
-        title: "已获取模型",
+        title: silent ? "已自动获取模型" : "已获取模型",
         description: `成功获取 ${list.length} 个模型。`,
       });
     } catch {
-      toast({
-        variant: "error",
-        title: "获取模型失败",
-        description: "网络错误，无法获取模型列表。你仍可以手动输入 Model。",
-      });
+      if (!silent) {
+        toast({
+          variant: "error",
+          title: "获取模型失败",
+          description: "网络错误，无法获取模型列表。你仍可以手动输入 Model。",
+        });
+      }
     } finally {
       setRefreshing(false);
     }
   };
+
+  const handleRefreshModels = () => void doFetchModels(false);
+
+  // 自动检测：Base URL 与 API Token 均填写完成后，防抖自动获取模型列表
+  React.useEffect(() => {
+    const url = normalizeBaseURL(baseURL).trim();
+    const key = apiKey.trim();
+    if (!url || !key) return;
+
+    const combo = `${url}\n${key}`;
+    // 同一组合只自动获取一次
+    if (autoFetchedRef.current === combo) return;
+
+    const timer = setTimeout(() => {
+      autoFetchedRef.current = combo;
+      void doFetchModels(true);
+    }, 800);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseURL, apiKey]);
 
   const handleTestConnection = async () => {
     if (!baseURL.trim() || !apiKey.trim() || !model.trim()) {
