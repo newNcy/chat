@@ -1,0 +1,14 @@
+初始化 AI API Chat：Next.js 15 全栈聊天应用
+
+- 支持任意 OpenAI-compatible API（用户自配 Base URL/Token/Model）
+- 流式输出（打字机式平滑渲染）+ 停止/重新生成
+- 多会话管理（新建/重命名/删除/分组，localStorage 持久化）
+- AI 与用户形象自定义（名称/头像预设/设备上传）
+- 聊天背景自定义（上传+强度调节，明暗主题适配）
+- 预制 System Prompt
+- Markdown + 代码高亮 + 复制
+- 图片消息（上传/粘贴/拖拽，vision 多模态）
+- SSRF 防护（协议/内网/云 metadata 校验）
+- Cursor 风格 UI（默认暗色、明暗切换、响应式、移动端 Drawer）
+- 模型列表获取（Refresh Models）+ 连接测试
+- 友好错误处理（401/403/404/429/5xx/网络错误）
