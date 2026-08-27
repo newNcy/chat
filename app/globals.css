@@ -141,19 +141,3 @@
 .markdown-body img {
   @apply max-w-full rounded-lg my-3;
 }
-
-/* 流式输出时末尾淡入，不破坏 Markdown 结构 */
-.streaming-md-fade {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 calc(100% - 0.7em),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 calc(100% - 0.7em),
-    transparent 100%
-  );
-}

@@ -101,6 +101,57 @@ export function Chat({ onOpenSettings }: ChatProps) {
     if (streaming) scrollToBottom();
   }, [messages, streaming, scrollToBottom]);
 
+  // 软键盘弹出导致布局高度变化时，把对话滚回底部
+  React.useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const isInputFocused = () => {
+      const t = document.activeElement as HTMLElement | null;
+      return !!(
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      );
+    };
+
+    const settleToBottom = () => {
+      if (!isInputFocused() && !isNearBottom(120)) return;
+      pinScrollToBottom();
+      requestAnimationFrame(() => {
+        pinScrollToBottom();
+        // 键盘动画过程中高度会连续变化，再补一次
+        setTimeout(pinScrollToBottom, 120);
+        setTimeout(pinScrollToBottom, 280);
+      });
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        settleToBottom();
+      }
+    };
+
+    vv.addEventListener("resize", settleToBottom);
+    vv.addEventListener("scroll", settleToBottom);
+    document.addEventListener("focusin", onFocusIn);
+    window.addEventListener("app-keyboard-viewport", settleToBottom);
+
+    return () => {
+      vv.removeEventListener("resize", settleToBottom);
+      vv.removeEventListener("scroll", settleToBottom);
+      document.removeEventListener("focusin", onFocusIn);
+      window.removeEventListener("app-keyboard-viewport", settleToBottom);
+    };
+  }, [pinScrollToBottom, isNearBottom]);
+
   // 流式逐字显现时内容高度在子组件内变化，需监听尺寸
   React.useEffect(() => {
     if (!streaming) return;

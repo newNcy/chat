@@ -77,6 +77,9 @@ export function getProviderMeta(modelId: string): ProviderMeta {
   return { provider, ...META[provider] };
 }
 
-export function getModelIconUrl(iconId: string): string {
-  return `https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/dark/${iconId}.png`;
+export function getModelIconUrl(
+  iconId: string,
+  theme: "light" | "dark" = "dark"
+): string {
+  return `https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/${theme}/${iconId}.png`;
 }

@@ -28,8 +28,10 @@ export function useKeyboardViewport() {
         if (vv.offsetTop > 0) {
           window.scrollTo(0, 0);
         }
+        window.dispatchEvent(new Event("app-keyboard-viewport"));
       } else {
         root.style.removeProperty("--app-height");
+        window.dispatchEvent(new Event("app-keyboard-viewport"));
       }
     };
 

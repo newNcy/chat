@@ -222,9 +222,6 @@ export function ChatInput({
           </div>
           </div>
         </div>
-        <p className="mt-1.5 px-1 text-center text-[11px] text-muted-foreground">
-          AI 可能会出错，请核对重要信息。所有配置与记录仅保存在本地浏览器。
-        </p>
       </div>
     </div>
   );
