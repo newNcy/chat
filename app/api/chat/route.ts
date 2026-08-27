@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
       model: provider(model),
       messages: coreMessages,
       abortSignal: req.signal,
+      maxRetries: 3,
       onError: () => {
         // 静默：避免将上游错误细节（可能含敏感信息）写入日志
       },

@@ -77,7 +77,7 @@
 
 /* Markdown 内容样式 */
 .markdown-body {
-  @apply text-sm leading-7 break-words;
+  @apply text-sm leading-5 break-words;
 }
 .markdown-body > *:first-child {
   margin-top: 0 !important;
@@ -104,13 +104,13 @@
   @apply text-base;
 }
 .markdown-body p {
-  @apply my-3;
+  @apply my-2;
 }
 .markdown-body ul {
-  @apply my-3 list-disc pl-6 space-y-1;
+  @apply my-2 list-disc pl-6 space-y-0.5;
 }
 .markdown-body ol {
-  @apply my-3 list-decimal pl-6 space-y-1;
+  @apply my-2 list-decimal pl-6 space-y-0.5;
 }
 .markdown-body li > ul,
 .markdown-body li > ol {

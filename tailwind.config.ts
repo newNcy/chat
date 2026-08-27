@@ -62,11 +62,16 @@ const config: Config = {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        "loading-dot": {
+          "0%, 33.33%": { backgroundColor: "rgb(34 197 94)" },
+          "36%, 100%": { backgroundColor: "hsl(var(--muted-foreground) / 0.25)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.2s ease-out",
+        "loading-dot": "loading-dot 1.8s ease-in-out infinite",
       },
     },
   },

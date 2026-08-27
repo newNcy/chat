@@ -44,6 +44,13 @@ export interface ImageAttachment {
 
 export type MessageRole = "user" | "assistant" | "system";
 
+/** 同一条 assistant 消息的一个回答分支 */
+export interface MessageVariant {
+  content: string;
+  createdAt: number;
+  error?: string;
+}
+
 /** 会话内单条消息 */
 export interface ChatMessage {
   id: string;
@@ -55,6 +62,10 @@ export interface ChatMessage {
   pending?: boolean;
   /** 错误信息（若生成失败） */
   error?: string;
+  /** 重新生成时保留的历史回答分支 */
+  variants?: MessageVariant[];
+  /** 当前展示的分支索引（0-based） */
+  activeVariantIndex?: number;
 }
 
 /** 一个会话 */

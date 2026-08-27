@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Check, Copy, RefreshCw, AlertCircle } from "lucide-react";
+import { Check, Copy, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Markdown } from "@/components/chat/markdown";
+import { LoadingDots } from "@/components/chat/loading-dots";
 import { AiAvatar, UserAvatar } from "@/components/chat/ai-avatar";
 import { useAppStore } from "@/lib/store/app-store";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,12 @@ interface MessageItemProps {
   onRegenerate?: () => void;
   /** 当前是否正在流式生成 */
   streaming?: boolean;
+  /** 分支导航：当前分支序号（1-based） */
+  variantIndex?: number;
+  /** 分支总数 */
+  variantCount?: number;
+  onPrevVariant?: () => void;
+  onNextVariant?: () => void;
 }
 
 export const MessageItem = React.memo(function MessageItem({
@@ -22,6 +29,10 @@ export const MessageItem = React.memo(function MessageItem({
   canRegenerate,
   onRegenerate,
   streaming,
+  variantIndex,
+  variantCount,
+  onPrevVariant,
+  onNextVariant,
 }: MessageItemProps) {
   const [copied, setCopied] = React.useState(false);
   const { preferences } = useAppStore();
@@ -39,6 +50,7 @@ export const MessageItem = React.memo(function MessageItem({
 
   return (
     <div
+      data-message-id={message.id}
       className={cn(
         "group/msg flex gap-3 px-4 py-4 sm:px-6",
         // 用户消息整体右对齐，头像在右
@@ -100,22 +112,18 @@ export const MessageItem = React.memo(function MessageItem({
           </div>
         ) : isUser ? (
           /* 用户消息：右对齐气泡 */
-          <div className="max-w-full whitespace-pre-wrap break-words rounded-2xl bg-secondary px-4 py-2.5 text-sm leading-7">
+          <div className="max-w-full min-h-9 whitespace-pre-wrap break-words rounded-2xl bg-secondary px-3.5 py-2 text-sm leading-5">
             {message.content}
           </div>
         ) : (
           <>
             {message.content ? (
-              <div className="max-w-full rounded-2xl bg-secondary px-4 py-2.5">
+              <div className="max-w-full min-h-9 rounded-2xl bg-secondary px-3.5 py-2">
                 <Markdown content={message.content} />
               </div>
-            ) : streaming ? (
-              <div className="rounded-2xl bg-secondary px-4 py-3">
-                <div className="flex h-5 items-center gap-1">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground" />
-                </div>
+            ) : streaming || message.pending ? (
+              <div className="flex min-h-9 items-center rounded-2xl bg-secondary px-3.5 py-2">
+                <LoadingDots />
               </div>
             ) : null}
           </>
@@ -125,14 +133,57 @@ export const MessageItem = React.memo(function MessageItem({
         {!message.pending && !streaming && (message.content || message.error) && (
           <div
             className={cn(
-              "flex items-center gap-1 pt-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100",
+              "flex items-center gap-1 pt-0.5",
               isUser && "justify-end"
             )}
           >
+            {!isUser && variantCount && variantCount > 1 && variantIndex && (
+              <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={onPrevVariant}
+                  disabled={variantIndex <= 1}
+                  className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground active:bg-accent disabled:opacity-30 disabled:hover:bg-transparent"
+                  aria-label="上一个回答"
+                  title="上一个回答"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-[2.5rem] text-center tabular-nums">
+                  {variantIndex}/{variantCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={onNextVariant}
+                  disabled={variantIndex >= variantCount}
+                  className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground active:bg-accent disabled:opacity-30 disabled:hover:bg-transparent"
+                  aria-label="下一个回答"
+                  title="下一个回答"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            {!isUser && canRegenerate && onRegenerate && (
+              <button
+                type="button"
+                onClick={onRegenerate}
+                className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:bg-accent"
+                aria-label="重新生成"
+                title="重新生成"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                重新生成
+              </button>
+            )}
             {!message.error && (
               <button
+                type="button"
                 onClick={handleCopy}
-                className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className={cn(
+                  "flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:bg-accent",
+                  "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100"
+                )}
                 aria-label="复制消息"
                 title="复制"
               >
@@ -141,17 +192,6 @@ export const MessageItem = React.memo(function MessageItem({
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
-              </button>
-            )}
-            {!isUser && canRegenerate && onRegenerate && (
-              <button
-                onClick={onRegenerate}
-                className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label="重新生成"
-                title="重新生成"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                重新生成
               </button>
             )}
           </div>
