@@ -311,19 +311,6 @@ export function Chat({ onOpenSettings }: ChatProps) {
     return null;
   }, [messages]);
 
-  // 预制 Prompt 作为第一条消息展示（虚拟消息，不落盘；
-  // 发送时也会作为首条 user 消息一并发给 API）
-  const promptMessage = React.useMemo(() => {
-    const p = preferences.systemPrompt?.trim();
-    if (!p) return null;
-    return {
-      id: "__system_prompt__",
-      role: "user" as const,
-      content: p,
-      createdAt: 0,
-    };
-  }, [preferences.systemPrompt]);
-
   return (
     <div className="relative z-10 flex min-h-0 flex-1 flex-col">
       {/* 消息区 */}
@@ -331,7 +318,7 @@ export function Chat({ onOpenSettings }: ChatProps) {
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto scrollbar-thin"
       >
-        {messages.length === 0 && !promptMessage ? (
+        {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
             <AiAvatar
               avatarId={preferences.aiAvatarId}
@@ -361,9 +348,6 @@ export function Chat({ onOpenSettings }: ChatProps) {
           </div>
         ) : (
           <div className="mx-auto max-w-3xl">
-            {promptMessage && (
-              <MessageItem message={promptMessage} />
-            )}
             {messages.map((msg) => (
               <MessageItem
                 key={msg.id}

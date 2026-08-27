@@ -64,8 +64,8 @@ export const MessageItem = React.memo(function MessageItem({
       <div
         className={cn(
           "min-w-0 max-w-full flex-1 space-y-1.5",
-          // 用户消息内容靠右
-          isUser && "flex flex-col items-end"
+          // 气泡收缩到内容宽度：用户靠右、AI 靠左（短内容不占满布局）
+          isUser ? "flex flex-col items-end" : "flex flex-col items-start"
         )}
       >
         {/* 用户消息不显示名字，AI 名称已在顶部顶栏展示 */}
