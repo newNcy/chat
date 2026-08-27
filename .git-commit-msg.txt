@@ -1,7 +1,0 @@
-重构：AI 头像与我的头像设置组件统一为共享 AvatarPicker
-
-- 提取 components/settings/avatar-picker.tsx 共享组件
-- 两处头像选择网格样式完全一致（grid-cols-5、36px 头像、同款上传/移除交互）
-- AI 头像区从 grid-cols-9 单行调整为与我的头像相同的两行布局
-- 删除 assistant-dialog 中重复的内联网格代码（净减约 150 行）
-- lint / tsc 类型检查通过
