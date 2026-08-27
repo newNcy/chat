@@ -101,6 +101,21 @@ export function Chat({ onOpenSettings }: ChatProps) {
     if (streaming) scrollToBottom();
   }, [messages, streaming, scrollToBottom]);
 
+  // 流式逐字显现时内容高度在子组件内变化，需监听尺寸
+  React.useEffect(() => {
+    if (!streaming) return;
+    const container = scrollRef.current;
+    const content = container?.firstElementChild as HTMLElement | undefined;
+    if (!content) return;
+
+    const pin = () => pinScrollToBottom();
+    const observer = new ResizeObserver(pin);
+    observer.observe(content);
+    pin();
+
+    return () => observer.disconnect();
+  }, [streaming, pinScrollToBottom]);
+
   /** 执行一次生成：给定要发送的消息列表（不含待填充的 assistant） */
   const runGeneration = React.useCallback(
     async (
@@ -243,40 +258,12 @@ export function Chat({ onOpenSettings }: ChatProps) {
         }
 
         let accumulated = "";
-        let displayed = "";
-        let streamDone = false;
-        let typingDone = false;
-        let rafId: number | null = null;
         let attemptErrored = false;
         let attemptErrorMsg = "";
         let attemptStatus: number | undefined;
 
-        const flushDisplayed = () => {
-          syncAssistant({ content: displayed, pending: true });
-        };
-
-        const jumpToEnd = () => {
-          if (rafId !== null) {
-            cancelAnimationFrame(rafId);
-            rafId = null;
-          }
-          displayed = accumulated;
-          typingDone = true;
-          flushDisplayed();
-        };
-
-        const typeLoop = () => {
-          const remaining = accumulated.length - displayed.length;
-          if (remaining > 0) {
-            const step = Math.max(1, Math.ceil(remaining * 0.05));
-            displayed = accumulated.slice(0, displayed.length + step);
-            flushDisplayed();
-          } else if (streamDone) {
-            typingDone = true;
-            rafId = null;
-            return;
-          }
-          rafId = requestAnimationFrame(typeLoop);
+        const flushContent = (pending = true) => {
+          syncAssistant({ content: accumulated, pending });
         };
 
         try {
@@ -309,47 +296,38 @@ export function Chat({ onOpenSettings }: ChatProps) {
             await readDataStream(res.body, {
               onText: (delta) => {
                 accumulated += delta;
-                if (rafId === null) {
-                  rafId = requestAnimationFrame(typeLoop);
-                }
+                flushContent(true);
               },
               onError: (msg) => {
                 attemptErrored = true;
                 attemptErrorMsg = msg;
-                jumpToEnd();
+                flushContent(false);
               },
             });
-
-            streamDone = true;
-            while (!typingDone) {
-              await new Promise<void>((resolve) =>
-                requestAnimationFrame(() => resolve())
-              );
-            }
           }
         } catch (err) {
           const name = (err as { name?: string })?.name;
           if (name === "AbortError") {
             aborted = true;
-            jumpToEnd();
+            flushContent(false);
             break;
           }
           attemptErrored = true;
           attemptErrorMsg =
             (err as { message?: string })?.message ??
             "无法连接到 API，请检查网络或配置。";
-          jumpToEnd();
+          flushContent(false);
         }
 
         if (aborted) break;
 
-        if (!attemptErrored && displayed.trim()) {
+        if (!attemptErrored && accumulated.trim()) {
           succeeded = true;
           if (regenerateSnapshot) {
-            commitRegenerateVariant(displayed);
+            commitRegenerateVariant(accumulated);
           } else {
             syncAssistant({
-              content: displayed,
+              content: accumulated,
               pending: false,
               error: undefined,
             });
@@ -598,6 +576,9 @@ export function Chat({ onOpenSettings }: ChatProps) {
                   hasVariants
                     ? () => handleSwitchVariant(msg.id, "next")
                     : undefined
+                }
+                onStreamScroll={
+                  msg.id === lastAssistantId ? pinScrollToBottom : undefined
                 }
               />
             );

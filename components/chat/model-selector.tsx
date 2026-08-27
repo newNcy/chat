@@ -4,6 +4,8 @@ import * as React from "react";
 import { Boxes, Check, Plus, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
+import { ModelIcon } from "@/components/models/model-icon";
+import { ModelLabel } from "@/components/models/model-label";
 import { useAppStore } from "@/lib/store/app-store";
 
 interface ModelSelectorProps {
@@ -42,7 +44,11 @@ export function ModelSelector({ onOpenSettings }: ModelSelectorProps) {
           aria-label="选择模型"
           title={`${currentConfig?.name ?? ""} · ${currentConfig?.model ?? ""}`}
         >
-          <Boxes />
+          {currentConfig?.model ? (
+            <ModelIcon model={currentConfig.model} size="md" />
+          ) : (
+            <Boxes />
+          )}
         </Button>
       }
     >
@@ -87,12 +93,14 @@ export function ModelSelector({ onOpenSettings }: ModelSelectorProps) {
                   ) : (
                     <span className="w-4 shrink-0" />
                   )}
-                  <span className="max-w-[220px] truncate">{m}</span>
+                  <span className="max-w-[220px]">
+                    <ModelLabel model={m} truncate />
+                  </span>
                 </DropdownItem>
               ))
           ) : (
             <p className="px-2 py-1 text-xs text-muted-foreground">
-              暂无模型列表，可在设置中获取或手动填写
+              暂无可用模型，请在设置中刷新
             </p>
           )}
           <div className="my-1 border-t" />

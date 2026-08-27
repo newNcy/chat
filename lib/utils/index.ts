@@ -32,6 +32,27 @@ export function getDateGroupLabel(timestamp: number): string {
   return "更早";
 }
 
+import type { Conversation } from "@/types";
+
+/** 会话列表预览：最后一条有效回复的开头 */
+export function getConversationLastPreview(
+  conv: Conversation,
+  maxLen = 36
+): string {
+  const messages = conv.messages.filter((m) => !m.error && m.content.trim());
+  if (messages.length === 0) return "还没有消息";
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") {
+      const clean = messages[i].content.trim().replace(/\s+/g, " ");
+      return clean.length > maxLen ? clean.slice(0, maxLen) + "…" : clean;
+    }
+  }
+
+  const last = messages[messages.length - 1].content.trim().replace(/\s+/g, " ");
+  return last.length > maxLen ? last.slice(0, maxLen) + "…" : last;
+}
+
 /** 从首条用户消息生成会话标题 */
 export function deriveTitle(text: string): string {
   const clean = text.trim().replace(/\s+/g, " ");

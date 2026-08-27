@@ -12,6 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toaster";
+import { ModelLabel } from "@/components/models/model-label";
 import { normalizeBaseURL } from "@/lib/utils";
 import type { AIConfig } from "@/types";
 
@@ -28,6 +29,8 @@ interface ApiConfigFormProps {
   onCancel: () => void;
 }
 
+type FetchState = "idle" | "loading" | "done";
+
 export function ApiConfigForm({
   initial,
   onSubmit,
@@ -38,18 +41,35 @@ export function ApiConfigForm({
   const [apiKey, setApiKey] = React.useState(initial?.apiKey ?? "");
   const [model, setModel] = React.useState(initial?.model ?? "");
   const [models, setModels] = React.useState<string[]>(initial?.models ?? []);
+  const [fetchState, setFetchState] = React.useState<FetchState>(
+    initial?.models?.length ? "done" : "idle"
+  );
   const [showToken, setShowToken] = React.useState(false);
   const [testing, setTesting] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
-  // 已自动获取过的 URL+Token 组合（避免重复请求）
-  const autoFetchedRef = React.useRef<string>("");
+  const autoFetchedRef = React.useRef<string>(
+    initial?.baseURL && initial?.apiKey
+      ? `${normalizeBaseURL(initial.baseURL)}\n${initial.apiKey.trim()}`
+      : ""
+  );
 
-  const canSubmit = name.trim() && baseURL.trim() && apiKey.trim() && model.trim();
+  const canSubmit =
+    name.trim() &&
+    baseURL.trim() &&
+    apiKey.trim() &&
+    models.length > 0 &&
+    model.trim();
+
+  const applyModelList = (list: string[]) => {
+    setModels(list);
+    setModel(list[0] ?? "");
+    setFetchState("done");
+  };
 
   /**
    * 获取模型列表
-   * @param silent 静默模式（自动检测触发）：失败不弹提示，避免打断输入
+   * @param silent 静默模式（自动检测触发）：失败不弹提示
    */
   const doFetchModels = async (silent: boolean) => {
     if (!baseURL.trim() || !apiKey.trim()) {
@@ -63,6 +83,7 @@ export function ApiConfigForm({
       return;
     }
     setRefreshing(true);
+    setFetchState("loading");
     try {
       const res = await fetch("/api/models", {
         method: "POST",
@@ -74,31 +95,39 @@ export function ApiConfigForm({
       });
       const data = await res.json();
       if (!res.ok) {
+        setModels([]);
+        setModel("");
+        setFetchState("done");
         if (!silent) {
           toast({
             variant: "error",
             title: data?.error?.title ?? "获取模型失败",
-            description:
-              (data?.error?.message ?? "无法获取模型列表。") +
-              "\n你仍可以手动输入 Model。",
+            description: data?.error?.message ?? "无法获取模型列表。",
           });
         }
         return;
       }
       const list: string[] = data.models ?? [];
-      setModels(list);
-      if (list.length > 0 && !model) setModel(list[0]);
-      toast({
-        variant: "success",
-        title: silent ? "已自动获取模型" : "已获取模型",
-        description: `成功获取 ${list.length} 个模型。`,
-      });
+      applyModelList(list);
+      if (!silent) {
+        toast({
+          variant: "success",
+          title: "已获取模型",
+          description:
+            list.length > 0
+              ? `成功获取 ${list.length} 个模型。`
+              : "该 API 未返回可用模型。",
+        });
+      }
     } catch {
+      setModels([]);
+      setModel("");
+      setFetchState("done");
       if (!silent) {
         toast({
           variant: "error",
           title: "获取模型失败",
-          description: "网络错误，无法获取模型列表。你仍可以手动输入 Model。",
+          description: "网络错误，无法获取模型列表。",
         });
       }
     } finally {
@@ -106,17 +135,29 @@ export function ApiConfigForm({
     }
   };
 
-  const handleRefreshModels = () => void doFetchModels(false);
+  const handleRefreshModels = () => {
+    autoFetchedRef.current = "";
+    void doFetchModels(false);
+  };
 
-  // 自动检测：Base URL 与 API Token 均填写完成后，防抖自动获取模型列表
+  // Base URL 与 Token 填写完成后自动探测模型
   React.useEffect(() => {
     const url = normalizeBaseURL(baseURL).trim();
     const key = apiKey.trim();
-    if (!url || !key) return;
+    if (!url || !key) {
+      setModels([]);
+      setModel("");
+      setFetchState("idle");
+      autoFetchedRef.current = "";
+      return;
+    }
 
     const combo = `${url}\n${key}`;
-    // 同一组合只自动获取一次
     if (autoFetchedRef.current === combo) return;
+
+    setModels([]);
+    setModel("");
+    setFetchState("loading");
 
     const timer = setTimeout(() => {
       autoFetchedRef.current = combo;
@@ -132,7 +173,7 @@ export function ApiConfigForm({
       toast({
         variant: "error",
         title: "无法测试",
-        description: "请先填写 Base URL、API Token 和 Model。",
+        description: "请先填写 Base URL、API Token，并确保已获取到可用模型。",
       });
       return;
     }
@@ -150,7 +191,6 @@ export function ApiConfigForm({
       });
 
       if (res.ok) {
-        // 读取一小段流确认可用后立即中断
         try {
           await res.body?.getReader().cancel();
         } catch {
@@ -191,6 +231,19 @@ export function ApiConfigForm({
       models,
     });
   };
+
+  const modelStatusText = (() => {
+    if (!baseURL.trim() || !apiKey.trim()) {
+      return "填写 Base URL 和 Token 后自动获取";
+    }
+    if (fetchState === "loading" || refreshing) {
+      return "正在获取模型…";
+    }
+    if (models.length === 0) {
+      return "无可用";
+    }
+    return null;
+  })();
 
   return (
     <form onSubmit={handleSubmit}>
@@ -258,55 +311,39 @@ export function ApiConfigForm({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="cfg-model">Model</Label>
+            <Label>可用模型</Label>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={handleRefreshModels}
-              disabled={refreshing}
+              disabled={refreshing || !baseURL.trim() || !apiKey.trim()}
             >
-              <RefreshCw
-                className={refreshing ? "animate-spin" : ""}
-              />
-              Refresh Models
+              <RefreshCw className={refreshing ? "animate-spin" : ""} />
+              刷新
             </Button>
           </div>
-          <Input
-            id="cfg-model"
-            placeholder="例如：grok-4"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            list="cfg-model-list"
-          />
-          {models.length > 0 && (
-            <datalist id="cfg-model-list">
-              {models.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          )}
-          {models.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {models.slice(0, 12).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setModel(m)}
-                  className={`rounded-full border px-2 py-0.5 text-xs transition-colors hover:bg-accent ${
-                    model === m ? "border-primary bg-accent" : ""
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-              {models.length > 12 && (
-                <span className="px-1 py-0.5 text-xs text-muted-foreground">
-                  等 {models.length} 个
-                </span>
-              )}
+
+          {modelStatusText ? (
+            <p className="text-sm text-muted-foreground">{modelStatusText}</p>
+          ) : (
+            <div className="max-h-40 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+              <div className="flex flex-wrap gap-1.5">
+                {models.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setModel(m)}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-accent ${
+                      model === m
+                        ? "border-primary bg-accent font-medium"
+                        : "border-border"
+                    }`}
+                  >
+                    <ModelLabel model={m} />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -317,7 +354,7 @@ export function ApiConfigForm({
             variant="outline"
             size="sm"
             onClick={handleTestConnection}
-            disabled={testing}
+            disabled={testing || !model}
           >
             <Wifi className={testing ? "animate-pulse" : ""} />
             Test Connection

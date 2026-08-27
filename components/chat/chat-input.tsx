@@ -116,7 +116,7 @@ export function ChatInput({
           {toolbar && <div className="shrink-0 pb-1.5">{toolbar}</div>}
           <div
             className={cn(
-              "relative min-w-0 flex-1 rounded-xl border bg-background shadow-sm transition-colors",
+              "relative min-w-0 flex-1 rounded-lg border bg-background shadow-sm transition-colors",
             dragging && "border-primary ring-2 ring-primary/30",
             disabled && "opacity-60"
           )}

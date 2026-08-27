@@ -6,13 +6,14 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { AiAvatar } from "@/components/chat/ai-avatar";
 import { useAppStore } from "@/lib/store/app-store";
-import { getDateGroupLabel, cn } from "@/lib/utils";
+import { DEFAULT_PREFERENCES } from "@/lib/storage";
+import { getConversationLastPreview, getDateGroupLabel, cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
 interface SidebarProps {
@@ -23,11 +24,14 @@ interface SidebarProps {
 
 const GROUP_ORDER = ["今天", "昨天", "过去 7 天", "更早"];
 
+function getConversationAiName(conv: Conversation): string {
+  return conv.preferences?.aiName?.trim() || DEFAULT_PREFERENCES.aiName;
+}
+
 export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
   const {
     conversations,
     currentConversationId,
-    newConversation,
     selectConversation,
     deleteConversation,
     renameConversation,
@@ -39,7 +43,6 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
 
-  // 按更新时间排序后分组
   const grouped = React.useMemo(() => {
     const sorted = [...conversations].sort(
       (a, b) => b.updatedAt - a.updatedAt
@@ -58,7 +61,7 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
 
   const startRename = (conv: Conversation) => {
     setRenamingId(conv.id);
-    setRenameValue(conv.title);
+    setRenameValue(getConversationAiName(conv));
   };
 
   const commitRename = () => {
@@ -68,7 +71,6 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
 
   return (
     <div className="flex h-full flex-col bg-secondary/40">
-      {/* 会话列表 */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
         {conversations.length === 0 ? (
           <p className="px-3 py-8 text-center text-sm text-muted-foreground">
@@ -84,11 +86,13 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
                 {group.items.map((conv) => {
                   const active = conv.id === currentConversationId;
                   const isRenaming = renamingId === conv.id;
+                  const prefs = conv.preferences ?? DEFAULT_PREFERENCES;
+
                   return (
                     <div
                       key={conv.id}
                       className={cn(
-                        "group relative flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors",
+                        "group relative flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors",
                         active
                           ? "bg-accent"
                           : "hover:bg-accent/60 cursor-pointer"
@@ -99,7 +103,12 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
                         onNavigate?.();
                       }}
                     >
-                      <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <AiAvatar
+                        avatarId={prefs.aiAvatarId}
+                        customAvatar={prefs.customAvatar}
+                        className="h-10 w-10 shrink-0 rounded-lg"
+                      />
+
                       {isRenaming ? (
                         <input
                           autoFocus
@@ -111,12 +120,17 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
                             if (e.key === "Escape") setRenamingId(null);
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="min-w-0 flex-1 rounded border bg-background px-1 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                          className="min-w-0 flex-1 rounded border bg-background px-1.5 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
                         />
                       ) : (
-                        <span className="min-w-0 flex-1 truncate">
-                          {conv.title}
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium leading-5">
+                            {getConversationAiName(conv)}
+                          </p>
+                          <p className="truncate text-xs leading-4 text-muted-foreground">
+                            {getConversationLastPreview(conv)}
+                          </p>
+                        </div>
                       )}
 
                       {!isRenaming && (
@@ -177,7 +191,6 @@ export function Sidebar({ onOpenSettings, onNavigate }: SidebarProps) {
         )}
       </div>
 
-      {/* 底部：设置（主题开关已移至右上角顶栏） */}
       <div className="border-t p-3">
         <Button
           variant="ghost"

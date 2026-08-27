@@ -64,6 +64,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [currentConversationId, setCurrentConversationId] = React.useState<
     string | null
   >(null);
+  const currentConversationIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    currentConversationIdRef.current = currentConversationId;
+  }, [currentConversationId]);
 
   // 最新会话引用（供防抖持久化读取最新值）
   const conversationsRef = React.useRef<Conversation[]>([]);
@@ -107,48 +112,85 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         : loadedConfigs[0]?.id ?? null
     );
     setConversations(loadedConversations);
-    setCurrentConversationId(
+    const initialConversationId =
       loadedConversations.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.id ??
-        null
-    );
+      null;
+    currentConversationIdRef.current = initialConversationId;
+    setCurrentConversationId(initialConversationId);
     setHydrated(true);
   }, []);
 
-  // 偏好设置：写入当前对话（每个对话独立保存）；无对话时写入全局默认模板
+  // 偏好设置：写入当前对话（每个对话独立保存）；无对话时自动新建并写入
   const updatePreferences = React.useCallback(
     (patch: Partial<AppPreferences>) => {
-      if (currentConversationId) {
-        setConversations((prev) =>
-          prev.map((c) => {
-            if (c.id !== currentConversationId) return c;
-            const prefs = {
-              ...(c.preferences ?? defaultPreferences),
-              ...patch,
-            };
-            let title = c.title;
-            // AI 改名时同步默认/同名会话标题，保持顶栏与侧栏一致
-            if (
-              typeof patch.aiName === "string" &&
-              patch.aiName.trim() &&
-              (title === "新对话" || title === c.preferences?.aiName)
-            ) {
-              title = patch.aiName.trim();
-            }
-            return {
-              ...c,
-              preferences: prefs,
-              title,
-              updatedAt: Date.now(),
-            };
-          })
-        );
+      const activeId =
+        currentConversationIdRef.current ?? currentConversationId;
+
+      // 无对话时：新建会话并应用设置（避免设置丢失）
+      if (!activeId) {
+        const prefs = { ...DEFAULT_PREFERENCES, ...patch };
+        const newAiName =
+          typeof patch.aiName === "string" && patch.aiName.trim()
+            ? patch.aiName.trim()
+            : null;
+        const conv: Conversation = {
+          id: uid(),
+          title: newAiName || "新对话",
+          messages: [],
+          configId: currentConfigId ?? undefined,
+          preferences: prefs,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        currentConversationIdRef.current = conv.id;
+        setCurrentConversationId(conv.id);
+        setConversations((prev) => {
+          const next = [conv, ...prev];
+          conversationsRef.current = next;
+          return next;
+        });
         schedulePersist();
-      } else {
-        // 无对话时仅更新内存（新对话总是出厂默认，无需持久化）
-        setDefaultPreferences((prev) => ({ ...prev, ...patch }));
+        return;
       }
+
+      setConversations((prev) => {
+        const current = prev.find((c) => c.id === activeId);
+        const oldAiName =
+          current?.preferences?.aiName ?? DEFAULT_PREFERENCES.aiName;
+        const newAiName =
+          typeof patch.aiName === "string" && patch.aiName.trim()
+            ? patch.aiName.trim()
+            : null;
+
+        return prev.map((c) => {
+          const isCurrent = c.id === activeId;
+
+          if (!isCurrent) {
+            if (!newAiName) return c;
+            const shouldSyncTitle =
+              c.title === oldAiName ||
+              (c.title === DEFAULT_PREFERENCES.aiName &&
+                oldAiName === DEFAULT_PREFERENCES.aiName);
+            if (!shouldSyncTitle) return c;
+            return { ...c, title: newAiName, updatedAt: Date.now() };
+          }
+
+          const prefs = {
+            ...(c.preferences ?? DEFAULT_PREFERENCES),
+            ...patch,
+          };
+          const title = newAiName ?? c.title;
+          return {
+            ...c,
+            preferences: prefs,
+            title,
+            updatedAt: Date.now(),
+          };
+        });
+      });
+      schedulePersist();
     },
-    [currentConversationId, defaultPreferences, schedulePersist]
+    [currentConversationId, currentConfigId, schedulePersist]
   );
 
   // 持久化：配置
@@ -262,7 +304,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   // ------- 会话操作 -------
   const newConversation = React.useCallback(() => {
-    // 新对话完全使用出厂默认设置（默认头像、无预设任何信息）
     const conv: Conversation = {
       id: uid(),
       title: "新对话",
@@ -274,11 +315,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     };
     const next = [conv, ...conversations];
     persistConversations(next);
+    currentConversationIdRef.current = conv.id;
     setCurrentConversationId(conv.id);
     return conv;
   }, [conversations, currentConfigId, persistConversations]);
 
   const selectConversation = React.useCallback((id: string) => {
+    currentConversationIdRef.current = id;
     setCurrentConversationId(id);
   }, []);
 
@@ -287,9 +330,10 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       const next = conversations.filter((c) => c.id !== id);
       persistConversations(next);
       if (currentConversationId === id) {
-        setCurrentConversationId(
-          next.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.id ?? null
-        );
+        const nextId =
+          next.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.id ?? null;
+        currentConversationIdRef.current = nextId;
+        setCurrentConversationId(nextId);
       }
     },
     [conversations, currentConversationId, persistConversations]
@@ -297,10 +341,20 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const renameConversation = React.useCallback(
     (id: string, title: string) => {
-      const clean = title.trim() || "新对话";
+      const clean = title.trim() || "AI";
       persistConversations(
         conversations.map((c) =>
-          c.id === id ? { ...c, title: clean, updatedAt: Date.now() } : c
+          c.id === id
+            ? {
+                ...c,
+                title: clean,
+                preferences: {
+                  ...(c.preferences ?? DEFAULT_PREFERENCES),
+                  aiName: clean,
+                },
+                updatedAt: Date.now(),
+              }
+            : c
         )
       );
     },

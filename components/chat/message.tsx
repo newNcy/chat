@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, Copy, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
-import { Markdown } from "@/components/chat/markdown";
+import { StreamingMarkdown } from "@/components/chat/streaming-markdown";
 import { LoadingDots } from "@/components/chat/loading-dots";
 import { AiAvatar, UserAvatar } from "@/components/chat/ai-avatar";
 import { useAppStore } from "@/lib/store/app-store";
@@ -22,6 +22,8 @@ interface MessageItemProps {
   variantCount?: number;
   onPrevVariant?: () => void;
   onNextVariant?: () => void;
+  /** 流式文字显现时跟随滚动 */
+  onStreamScroll?: () => void;
 }
 
 export const MessageItem = React.memo(function MessageItem({
@@ -33,6 +35,7 @@ export const MessageItem = React.memo(function MessageItem({
   variantCount,
   onPrevVariant,
   onNextVariant,
+  onStreamScroll,
 }: MessageItemProps) {
   const [copied, setCopied] = React.useState(false);
   const { preferences } = useAppStore();
@@ -112,17 +115,22 @@ export const MessageItem = React.memo(function MessageItem({
           </div>
         ) : isUser ? (
           /* 用户消息：右对齐气泡 */
-          <div className="max-w-full min-h-9 whitespace-pre-wrap break-words rounded-2xl bg-secondary px-3.5 py-2 text-sm leading-5">
+          <div className="max-w-full min-h-9 whitespace-pre-wrap break-words rounded-lg bg-secondary px-3.5 py-2 text-sm leading-5">
             {message.content}
           </div>
         ) : (
           <>
             {message.content ? (
-              <div className="max-w-full min-h-9 rounded-2xl bg-secondary px-3.5 py-2">
-                <Markdown content={message.content} />
+              <div className="max-w-full min-h-9 rounded-lg bg-secondary px-3.5 py-2">
+                <StreamingMarkdown
+                  content={message.content}
+                  streaming={!!streaming}
+                  messageId={message.id}
+                  onReveal={onStreamScroll}
+                />
               </div>
             ) : streaming || message.pending ? (
-              <div className="flex min-h-9 items-center rounded-2xl bg-secondary px-3.5 py-2">
+              <div className="flex min-h-9 items-center rounded-lg bg-secondary px-3.5 py-2">
                 <LoadingDots />
               </div>
             ) : null}
