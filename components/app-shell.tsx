@@ -10,10 +10,13 @@ import { InstallButton } from "@/components/install-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { AppStoreProvider, useAppStore } from "@/lib/store/app-store";
+import { useKeyboardViewport } from "@/lib/hooks/use-keyboard-viewport";
 import { cn } from "@/lib/utils";
 
 function Shell() {
   const { newConversation, currentConfig, configs, preferences } = useAppStore();
+  // 移动端键盘适配：iOS 用 visualViewport 动态压缩布局高度
+  useKeyboardViewport();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [assistantOpen, setAssistantOpen] = React.useState(false);
   // 桌面端折叠
@@ -30,7 +33,7 @@ function Shell() {
   );
 
   return (
-    <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
+    <div className="flex h-[var(--app-height,100dvh)] w-full overflow-hidden bg-background">
       {/* 桌面端 Sidebar */}
       <aside
         className={cn(
