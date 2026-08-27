@@ -119,18 +119,28 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     (patch: Partial<AppPreferences>) => {
       if (currentConversationId) {
         setConversations((prev) =>
-          prev.map((c) =>
-            c.id === currentConversationId
-              ? {
-                  ...c,
-                  preferences: {
-                    ...(c.preferences ?? defaultPreferences),
-                    ...patch,
-                  },
-                  updatedAt: Date.now(),
-                }
-              : c
-          )
+          prev.map((c) => {
+            if (c.id !== currentConversationId) return c;
+            const prefs = {
+              ...(c.preferences ?? defaultPreferences),
+              ...patch,
+            };
+            let title = c.title;
+            // AI 改名时同步默认/同名会话标题，保持顶栏与侧栏一致
+            if (
+              typeof patch.aiName === "string" &&
+              patch.aiName.trim() &&
+              (title === "新对话" || title === c.preferences?.aiName)
+            ) {
+              title = patch.aiName.trim();
+            }
+            return {
+              ...c,
+              preferences: prefs,
+              title,
+              updatedAt: Date.now(),
+            };
+          })
         );
         schedulePersist();
       } else {
