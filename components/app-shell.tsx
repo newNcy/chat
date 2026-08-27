@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/sidebar/sidebar";
 import { Chat } from "@/components/chat/chat";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { AssistantDialog } from "@/components/settings/assistant-dialog";
+import { InstallButton } from "@/components/install-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { AppStoreProvider, useAppStore } from "@/lib/store/app-store";
@@ -119,6 +120,8 @@ function Shell() {
           </div>
 
           <div className="flex items-center gap-0.5">
+            {/* 右上角：安装到桌面（安卓可安装时 / iOS 显示） */}
+            <InstallButton />
             {/* 右上角：明暗主题开关 */}
             <ThemeToggle />
             {/* 右上角：对话设置（AI 名字 / 头像 / 预制 Prompt） */}
