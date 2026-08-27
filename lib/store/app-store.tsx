@@ -9,8 +9,6 @@ import {
   saveCurrentConfigId,
   loadConversations,
   saveConversations,
-  loadPreferences,
-  savePreferences,
   DEFAULT_PREFERENCES,
 } from "@/lib/storage";
 import { uid, deriveTitle } from "@/lib/utils";
@@ -97,13 +95,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const loadedConfigs = loadConfigs();
     const loadedCurrent = loadCurrentConfigId();
-    const loadedPrefs = loadPreferences();
-    // 旧数据迁移：无独立设置的会话填充全局偏好（此后各会话独立演化）
+    // 旧数据迁移：无独立设置的会话填充出厂默认（此后各会话独立演化）
     const loadedConversations = loadConversations().map((c) =>
-      c.preferences ? c : { ...c, preferences: loadedPrefs }
+      c.preferences ? c : { ...c, preferences: { ...DEFAULT_PREFERENCES } }
     );
 
-    setDefaultPreferences(loadedPrefs);
     setConfigs(loadedConfigs);
     setCurrentConfigId(
       loadedCurrent && loadedConfigs.some((c) => c.id === loadedCurrent)
@@ -138,18 +134,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         );
         schedulePersist();
       } else {
-        setDefaultPreferences((prev) => {
-          const next = { ...prev, ...patch };
-          const res = savePreferences(next);
-          if (!res.ok) {
-            toast({
-              variant: "error",
-              title: "保存失败",
-              description: res.error ?? "无法保存偏好设置",
-            });
-          }
-          return next;
-        });
+        // 无对话时仅更新内存（新对话总是出厂默认，无需持久化）
+        setDefaultPreferences((prev) => ({ ...prev, ...patch }));
       }
     },
     [currentConversationId, defaultPreferences, schedulePersist]
