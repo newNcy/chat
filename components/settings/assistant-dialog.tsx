@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ImagePlus, Loader2, Trash2, Upload } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -15,12 +15,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AiAvatar,
   UserAvatar,
   AVATAR_PRESETS,
   CUSTOM_AVATAR_ID,
   DEFAULT_USER_AVATAR_ID,
 } from "@/components/chat/ai-avatar";
+import {
+  AvatarPicker,
+  SelectedBadge,
+} from "@/components/settings/avatar-picker";
 import { useAppStore } from "@/lib/store/app-store";
 import { toast } from "@/components/ui/toaster";
 import { fileToCompressedDataUrl } from "@/lib/utils/image";
@@ -38,15 +41,6 @@ function toastError(title: string, description: string) {
   toast({ variant: "error", title, description });
 }
 
-/** 选中角标 */
-function SelectedBadge() {
-  return (
-    <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-      <Check className="h-2.5 w-2.5" />
-    </span>
-  );
-}
-
 /** 对话设置：自定义 AI 与我的形象、聊天背景、预制 Prompt */
 export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
   const { preferences, updatePreferences } = useAppStore();
@@ -58,8 +52,6 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
   const [userAvatarUploading, setUserAvatarUploading] = React.useState(false);
   const [bgUploading, setBgUploading] = React.useState(false);
 
-  const avatarInputRef = React.useRef<HTMLInputElement>(null);
-  const userAvatarInputRef = React.useRef<HTMLInputElement>(null);
   const bgInputRef = React.useRef<HTMLInputElement>(null);
 
   // 每次打开时同步最新值
@@ -122,18 +114,6 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
 
   // ---------- AI 头像 ----------
 
-  const isCustomSelected = preferences.aiAvatarId === CUSTOM_AVATAR_ID;
-  const hasCustomAvatar = Boolean(preferences.customAvatar);
-
-  /** 自定义格：无图/已选中 → 打开选择器；有图未选中 → 选中 */
-  const handleCustomCellClick = () => {
-    if (!hasCustomAvatar || isCustomSelected) {
-      avatarInputRef.current?.click();
-    } else {
-      updatePreferences({ aiAvatarId: CUSTOM_AVATAR_ID });
-    }
-  };
-
   const removeCustomAvatar = () => {
     updatePreferences({
       aiAvatarId: AVATAR_PRESETS[0].id,
@@ -143,18 +123,8 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
 
   // ---------- 我的头像 ----------
 
-  const isUserCustomSelected = preferences.userAvatarId === CUSTOM_AVATAR_ID;
-  const hasUserCustomAvatar = Boolean(preferences.userCustomAvatar);
   const currentUserAvatarId =
     preferences.userAvatarId ?? DEFAULT_USER_AVATAR_ID;
-
-  const handleUserCustomCellClick = () => {
-    if (!hasUserCustomAvatar || isUserCustomSelected) {
-      userAvatarInputRef.current?.click();
-    } else {
-      updatePreferences({ userAvatarId: CUSTOM_AVATAR_ID });
-    }
-  };
 
   const removeUserCustomAvatar = () => {
     updatePreferences({
@@ -226,201 +196,56 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
             />
           </div>
 
-          {/* AI 头像：预设 + 从设备上传 */}
+          {/* AI 头像：预设 + 从设备上传（与我的头像共用 AvatarPicker 组件） */}
           <div className="space-y-2">
             <Label>AI 头像</Label>
-            <div className="grid grid-cols-9 gap-1.5">
-              {AVATAR_PRESETS.map((preset) => {
-                const selected = preset.id === preferences.aiAvatarId;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    title={preset.label}
-                    aria-label={`头像：${preset.label}`}
-                    onClick={() => updatePreferences({ aiAvatarId: preset.id })}
-                    className={cn(
-                      "relative flex aspect-square w-full items-center justify-center rounded-md border p-1 transition-colors hover:bg-accent",
-                      selected ? "border-ring" : "border-transparent"
-                    )}
-                  >
-                    <AiAvatar avatarId={preset.id} className="h-8 w-8" />
-                    {selected && <SelectedBadge />}
-                  </button>
-                );
-              })}
-
-              {/* AI 自定义头像格 */}
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  void uploadAvatarImage(e.target.files?.[0], false);
-                  e.target.value = "";
-                }}
-              />
-              <div className="relative">
-                <button
-                  type="button"
-                  title={
-                    !hasCustomAvatar
-                      ? "从设备选择头像"
-                      : isCustomSelected
-                        ? "更换自定义头像"
-                        : "使用自定义头像"
-                  }
-                  aria-label="自定义头像"
-                  disabled={avatarUploading}
-                  onClick={handleCustomCellClick}
-                  className={cn(
-                    "flex aspect-square w-full items-center justify-center rounded-md border p-1 transition-colors hover:bg-accent disabled:opacity-60",
-                    isCustomSelected ? "border-ring" : "border-dashed"
-                  )}
-                >
-                  {avatarUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  ) : hasCustomAvatar && preferences.customAvatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={preferences.customAvatar}
-                      alt="自定义头像"
-                      className="h-8 w-8 rounded object-cover"
-                    />
-                  ) : (
-                    <Upload className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
-                {isCustomSelected && <SelectedBadge />}
-                {hasCustomAvatar && (
-                  <button
-                    type="button"
-                    title="移除自定义头像"
-                    aria-label="移除自定义头像"
-                    onClick={removeCustomAvatar}
-                    className="absolute -bottom-1.5 -right-1.5 rounded-full border bg-background p-0.5 shadow-sm hover:bg-accent"
-                  >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </button>
-                )}
-              </div>
-            </div>
+            <AvatarPicker
+              avatarId={preferences.aiAvatarId}
+              customAvatar={preferences.customAvatar}
+              uploading={avatarUploading}
+              onSelect={(id) => updatePreferences({ aiAvatarId: id })}
+              onUpload={(file) => void uploadAvatarImage(file, false)}
+              onRemoveCustom={removeCustomAvatar}
+            />
           </div>
 
-          {/* 我的头像：默认 + 预设 + 从设备上传 */}
+          {/* 我的头像：默认 + 预设 + 从设备上传（与 AI 头像共用 AvatarPicker 组件） */}
           <div className="space-y-2 border-t pt-4">
             <Label>我的头像</Label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {/* 默认样式格 */}
-                  <button
-                    type="button"
-                    title="默认"
-                    aria-label="头像：默认"
-                    onClick={() =>
-                      updatePreferences({
-                        userAvatarId: DEFAULT_USER_AVATAR_ID,
-                      })
-                    }
-                    className={cn(
-                      "relative flex aspect-square w-full items-center justify-center rounded-md border p-1 transition-colors hover:bg-accent",
-                      currentUserAvatarId === DEFAULT_USER_AVATAR_ID
-                        ? "border-ring"
-                        : "border-transparent"
-                    )}
-                  >
-                    <UserAvatar
-                      avatarId={DEFAULT_USER_AVATAR_ID}
-                      className="h-9 w-9"
-                    />
-                    {currentUserAvatarId === DEFAULT_USER_AVATAR_ID && (
-                      <SelectedBadge />
-                    )}
-                  </button>
-
-                  {/* 预设格 */}
-                  {AVATAR_PRESETS.map((preset) => {
-                    const selected = preset.id === currentUserAvatarId;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        title={preset.label}
-                        aria-label={`头像：${preset.label}`}
-                        onClick={() =>
-                          updatePreferences({ userAvatarId: preset.id })
-                        }
-                        className={cn(
-                          "relative flex aspect-square w-full items-center justify-center rounded-md border p-1 transition-colors hover:bg-accent",
-                          selected ? "border-ring" : "border-transparent"
-                        )}
-                      >
-                        <UserAvatar
-                          avatarId={preset.id}
-                          className="h-9 w-9"
-                        />
-                        {selected && <SelectedBadge />}
-                      </button>
-                    );
-                  })}
-
-                  {/* 我的自定义头像格 */}
-                  <input
-                    ref={userAvatarInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      void uploadAvatarImage(e.target.files?.[0], true);
-                      e.target.value = "";
-                    }}
+            <AvatarPicker
+              avatarId={currentUserAvatarId}
+              customAvatar={preferences.userCustomAvatar}
+              uploading={userAvatarUploading}
+              leadingSlot={
+                <button
+                  type="button"
+                  title="默认"
+                  aria-label="头像：默认"
+                  onClick={() =>
+                    updatePreferences({
+                      userAvatarId: DEFAULT_USER_AVATAR_ID,
+                    })
+                  }
+                  className={cn(
+                    "relative flex aspect-square w-full items-center justify-center rounded-md border p-1 transition-colors hover:bg-accent",
+                    currentUserAvatarId === DEFAULT_USER_AVATAR_ID
+                      ? "border-ring"
+                      : "border-transparent"
+                  )}
+                >
+                  <UserAvatar
+                    avatarId={DEFAULT_USER_AVATAR_ID}
+                    className="h-9 w-9"
                   />
-                  <div className="relative">
-                    <button
-                      type="button"
-                      title={
-                        !hasUserCustomAvatar
-                          ? "从设备选择头像"
-                          : isUserCustomSelected
-                            ? "更换自定义头像"
-                            : "使用自定义头像"
-                      }
-                      aria-label="自定义头像"
-                      disabled={userAvatarUploading}
-                      onClick={handleUserCustomCellClick}
-                      className={cn(
-                        "flex aspect-square w-full items-center justify-center rounded-md border p-1 transition-colors hover:bg-accent disabled:opacity-60",
-                        isUserCustomSelected ? "border-ring" : "border-dashed"
-                      )}
-                    >
-                      {userAvatarUploading ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : hasUserCustomAvatar &&
-                        preferences.userCustomAvatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={preferences.userCustomAvatar}
-                          alt="自定义头像"
-                          className="h-9 w-9 rounded object-cover"
-                        />
-                      ) : (
-                        <Upload className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </button>
-                    {isUserCustomSelected && <SelectedBadge />}
-                    {hasUserCustomAvatar && (
-                      <button
-                        type="button"
-                        title="移除自定义头像"
-                        aria-label="移除自定义头像"
-                        onClick={removeUserCustomAvatar}
-                        className="absolute -bottom-1.5 -right-1.5 rounded-full border bg-background p-0.5 shadow-sm hover:bg-accent"
-                      >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  {currentUserAvatarId === DEFAULT_USER_AVATAR_ID && (
+                    <SelectedBadge />
+                  )}
+                </button>
+              }
+              onSelect={(id) => updatePreferences({ userAvatarId: id })}
+              onUpload={(file) => void uploadAvatarImage(file, true)}
+              onRemoveCustom={removeUserCustomAvatar}
+            />
             <p className="text-xs text-muted-foreground">
               点击虚线格从设备上传图片，仅保存在本地浏览器。
             </p>
