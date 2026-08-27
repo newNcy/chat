@@ -17,6 +17,9 @@
 .DS_Store
 *.pem
 
+# AI 生成的临时图片
+/generated-images/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
