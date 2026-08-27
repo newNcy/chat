@@ -462,11 +462,15 @@ export function Chat({ onOpenSettings }: ChatProps) {
       const validVariants = getValidVariants(msg);
       if (validVariants.length <= 1) return;
 
-      const currentContent = msg.content;
-      const currentIdx = validVariants.findIndex(
-        (v) => v.content === currentContent
-      );
-      const current = currentIdx >= 0 ? currentIdx : validVariants.length - 1;
+      const byIndex =
+        typeof msg.activeVariantIndex === "number" &&
+        msg.activeVariantIndex >= 0 &&
+        msg.activeVariantIndex < validVariants.length
+          ? msg.activeVariantIndex
+          : -1;
+      const byContent = validVariants.findIndex((v) => v.content === msg.content);
+      const current =
+        byIndex >= 0 ? byIndex : byContent >= 0 ? byContent : validVariants.length - 1;
       const next =
         direction === "prev"
           ? Math.max(0, current - 1)
@@ -474,7 +478,6 @@ export function Chat({ onOpenSettings }: ChatProps) {
       if (next === current) return;
 
       const variant = validVariants[next];
-      const variants = validVariants;
       const pinBottom = isNearBottom();
       const msgEl = document.querySelector(
         `[data-message-id="${messageId}"]`
@@ -487,7 +490,7 @@ export function Chat({ onOpenSettings }: ChatProps) {
         i === idx
           ? {
               ...m,
-              variants,
+              variants: validVariants,
               activeVariantIndex: next,
               content: variant.content,
               error: variant.error,
@@ -548,11 +551,18 @@ export function Chat({ onOpenSettings }: ChatProps) {
             {messages.map((msg) => {
               const validVariants = getValidVariants(msg);
               const hasVariants = validVariants.length > 1;
-              const variantIdx = hasVariants
+              const byIndex =
+                typeof msg.activeVariantIndex === "number" &&
+                msg.activeVariantIndex >= 0 &&
+                msg.activeVariantIndex < validVariants.length
+                  ? msg.activeVariantIndex
+                  : -1;
+              const byContent = hasVariants
                 ? validVariants.findIndex((v) => v.content === msg.content)
                 : -1;
               const displayVariantIndex =
-                variantIdx >= 0 ? variantIdx + 1 : validVariants.length;
+                (byIndex >= 0 ? byIndex : byContent >= 0 ? byContent : validVariants.length - 1) +
+                1;
 
               return (
               <MessageItem

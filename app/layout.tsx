@@ -1,7 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+
+const notoSansSC = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "AI Chat",
@@ -28,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className="antialiased">
+      <body className={`${notoSansSC.variable} ${notoSansSC.className} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

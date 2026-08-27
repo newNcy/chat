@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import { Markdown } from "@/components/chat/markdown";
+import { cn } from "@/lib/utils";
 
 const CHARS_PER_SECOND = 1.5;
-const CHAR_FADE_MS = 580;
-const FADE_CHAR_COUNT = 12;
 
 /** 句末停顿（毫秒） */
 function getPauseAfter(text: string, index: number): number {
@@ -21,25 +20,30 @@ function getPauseAfter(text: string, index: number): number {
   return 0;
 }
 
-function getCharOpacity(
-  index: number,
-  visibleCount: number,
-  now: number,
-  revealedAt: Map<number, number>,
-  streaming: boolean
-): number {
-  const revealed = revealedAt.get(index) ?? now;
-  const fadeIn = Math.min(1, (now - revealed) / CHAR_FADE_MS);
-  let opacity = fadeIn;
+/**
+ * 尽量补全未闭合的 Markdown 标记，减少流式截断时的「源代码」闪烁。
+ */
+function stabilizeMarkdown(text: string): string {
+  if (!text) return text;
 
-  if (streaming && visibleCount > 0 && index >= visibleCount - FADE_CHAR_COUNT) {
-    const posInTail = index - Math.max(0, visibleCount - FADE_CHAR_COUNT);
-    const tailProgress =
-      FADE_CHAR_COUNT <= 1 ? 1 : posInTail / (FADE_CHAR_COUNT - 1);
-    opacity *= 1 - tailProgress * 0.82;
+  let out = text;
+
+  const fenceCount = (out.match(/^```/gm) ?? []).length;
+  if (fenceCount % 2 === 1) {
+    out += "\n```";
   }
 
-  return opacity;
+  const withoutBlocks = out.replace(/```[\s\S]*?```/g, "");
+  const inlineTicks = (withoutBlocks.match(/`/g) ?? []).length;
+  if (inlineTicks % 2 === 1) out += "`";
+
+  const withoutCode = out
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]*`/g, "");
+  const bold = (withoutCode.match(/\*\*/g) ?? []).length;
+  if (bold % 2 === 1) out += "**";
+
+  return out;
 }
 
 interface StreamingMarkdownProps {
@@ -56,102 +60,47 @@ export function StreamingMarkdown({
   onReveal,
 }: StreamingMarkdownProps) {
   const [visibleCount, setVisibleCount] = React.useState(0);
-  const [, setFadePulse] = React.useState(0);
   const contentRef = React.useRef(content);
   const countRef = React.useRef(0);
   const rafRef = React.useRef<number | null>(null);
-  const fadeRafRef = React.useRef<number | null>(null);
   const lastTimeRef = React.useRef<number | null>(null);
   const pausedUntilRef = React.useRef(0);
-  const hasStreamedRef = React.useRef(false);
-  const revealedAtRef = React.useRef<Map<number, number>>(new Map());
 
   contentRef.current = content;
 
-  const resetProgress = React.useCallback(() => {
-    countRef.current = 0;
-    setVisibleCount(0);
+  const stopLoop = React.useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     lastTimeRef.current = null;
     pausedUntilRef.current = 0;
-    revealedAtRef.current.clear();
   }, []);
 
-  const stopFadeLoop = React.useCallback(() => {
-    if (fadeRafRef.current !== null) {
-      cancelAnimationFrame(fadeRafRef.current);
-      fadeRafRef.current = null;
+  const showFull = React.useCallback(() => {
+    stopLoop();
+    countRef.current = contentRef.current.length;
+    setVisibleCount(contentRef.current.length);
+  }, [stopLoop]);
+
+  // 切换消息或分支内容：非流式时立即展示全文
+  React.useEffect(() => {
+    if (!streaming) {
+      showFull();
+      return;
     }
-  }, []);
-
-  const needsFadeFrame = React.useCallback(
-    (count: number, now: number) => {
-      if (streaming) return true;
-      for (let i = 0; i < count; i++) {
-        const t = revealedAtRef.current.get(i);
-        if (t !== undefined && now - t < CHAR_FADE_MS) return true;
-      }
-      return false;
-    },
-    [streaming]
-  );
-
-  const startFadeLoop = React.useCallback(() => {
-    if (fadeRafRef.current !== null) return;
-
-    const loop = (now: number) => {
-      const count = countRef.current;
-      if (needsFadeFrame(count, now)) {
-        setFadePulse((p) => p + 1);
-        fadeRafRef.current = requestAnimationFrame(loop);
-      } else {
-        fadeRafRef.current = null;
-      }
-    };
-
-    fadeRafRef.current = requestAnimationFrame(loop);
-  }, [needsFadeFrame]);
-
-  const markRevealed = React.useCallback(
-    (from: number, to: number, now: number) => {
-      for (let i = from; i < to; i++) {
-        if (!revealedAtRef.current.has(i)) {
-          revealedAtRef.current.set(i, now);
-        }
-      }
-      startFadeLoop();
-    },
-    [startFadeLoop]
-  );
-
-  React.useEffect(() => {
-    resetProgress();
-    hasStreamedRef.current = false;
-    return stopFadeLoop;
-  }, [messageId, resetProgress, stopFadeLoop]);
-
-  React.useEffect(() => {
-    if (streaming) {
-      hasStreamedRef.current = true;
-      if (content.length === 0) {
-        resetProgress();
-      }
+    // 重新生成开始：内容被清空
+    if (content.length === 0) {
+      stopLoop();
+      countRef.current = 0;
+      setVisibleCount(0);
     }
-  }, [streaming, content.length, resetProgress]);
+  }, [messageId, content, streaming, showFull, stopLoop]);
 
+  // 仅在流式生成中做逐字动画
   React.useEffect(() => {
-    if (content.length < countRef.current) {
-      resetProgress();
-    }
-  }, [content, resetProgress]);
+    if (!streaming) return;
 
-  React.useEffect(() => {
-    if (!streaming && !hasStreamedRef.current && content.length > 0) {
-      countRef.current = content.length;
-      setVisibleCount(content.length);
-    }
-  }, [streaming, content, messageId]);
-
-  React.useEffect(() => {
     const tick = (now: number) => {
       if (now < pausedUntilRef.current) {
         rafRef.current = requestAnimationFrame(tick);
@@ -173,7 +122,6 @@ export function StreamingMarkdown({
         const prevCount = countRef.current;
         const newCount = Math.min(targetLen, countRef.current + step);
         countRef.current = newCount;
-        markRevealed(prevCount, newCount, now);
         setVisibleCount(newCount);
         onReveal?.();
 
@@ -195,9 +143,7 @@ export function StreamingMarkdown({
       pausedUntilRef.current = 0;
     };
 
-    const shouldAnimate =
-      streaming || countRef.current < contentRef.current.length;
-    if (shouldAnimate && rafRef.current === null) {
+    if (countRef.current < contentRef.current.length && rafRef.current === null) {
       rafRef.current = requestAnimationFrame(tick);
     }
 
@@ -207,45 +153,25 @@ export function StreamingMarkdown({
         rafRef.current = null;
       }
     };
-  }, [streaming, content, visibleCount, onReveal, markRevealed]);
+  }, [streaming, content, visibleCount, onReveal]);
 
-  const isFullyRevealed = !streaming && visibleCount >= content.length;
+  const isFullyRevealed = !streaming || visibleCount >= content.length;
+  const visibleText = content.slice(0, visibleCount);
+  const showFade = streaming && !isFullyRevealed && visibleText.length > 0;
 
   React.useLayoutEffect(() => {
-    if (!isFullyRevealed) onReveal?.();
-  }, [visibleCount, isFullyRevealed, onReveal]);
+    if (streaming) onReveal?.();
+  }, [visibleCount, streaming, onReveal]);
 
-  React.useEffect(() => {
-    if (isFullyRevealed) stopFadeLoop();
-  }, [isFullyRevealed, stopFadeLoop]);
+  if (!content && !visibleText) return null;
 
-  if (isFullyRevealed && content) {
-    return <Markdown content={content} />;
-  }
-
-  if (!content) return null;
-
-  const visibleText = content.slice(0, visibleCount);
-  const now = performance.now();
+  const renderText = isFullyRevealed
+    ? content
+    : stabilizeMarkdown(visibleText);
 
   return (
-    <div className="text-sm leading-5 break-words whitespace-pre-wrap text-foreground">
-      {visibleText.split("").map((ch, i) => (
-        <span
-          key={i}
-          style={{
-            opacity: getCharOpacity(
-              i,
-              visibleCount,
-              now,
-              revealedAtRef.current,
-              streaming
-            ),
-          }}
-        >
-          {ch}
-        </span>
-      ))}
+    <div className={cn("relative", showFade && "streaming-md-fade")}>
+      <Markdown content={renderText} />
     </div>
   );
 }
