@@ -266,15 +266,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   // ------- 会话操作 -------
   const newConversation = React.useCallback(() => {
-    // 新对话继承当前生效的偏好设置（当前对话的独立设置或全局默认）
+    // 新对话使用默认设置（不继承当前对话的设置）
     const conv: Conversation = {
       id: uid(),
       title: "新对话",
       messages: [],
       configId: currentConfigId ?? undefined,
-      preferences: {
-        ...(currentConversation?.preferences ?? defaultPreferences),
-      },
+      preferences: { ...defaultPreferences },
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -285,7 +283,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   }, [
     conversations,
     currentConfigId,
-    currentConversation,
     defaultPreferences,
     persistConversations,
   ]);

@@ -4,7 +4,8 @@ import type { ChatMessage, ChatApiMessage, ChatApiContentPart } from "@/types";
 
 /**
  * @param messages 会话消息
- * @param systemPrompt 预制 Prompt，非空时作为首条 system 消息前置
+ * @param systemPrompt 预制 Prompt，非空时同时作为 system 消息与首条 user 消息前置
+ *   （双保险：部分 API/模型对 system 消息遵循不佳，首条 user 消息可确保指令可见）
  */
 export function toApiMessages(
   messages: ChatMessage[],
@@ -12,8 +13,12 @@ export function toApiMessages(
 ): ChatApiMessage[] {
   const result: ChatApiMessage[] = [];
 
-  if (systemPrompt && systemPrompt.trim()) {
-    result.push({ role: "system", content: systemPrompt.trim() });
+  const prompt = systemPrompt?.trim();
+  if (prompt) {
+    // 作为 system 消息
+    result.push({ role: "system", content: prompt });
+    // 同时作为第一条 user 消息（与界面展示一致）
+    result.push({ role: "user", content: prompt });
   }
 
   result.push(
