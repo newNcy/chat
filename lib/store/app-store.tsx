@@ -55,7 +55,8 @@ export function useAppStore(): AppState {
 
 export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = React.useState(false);
-  const [preferences, setPreferences] =
+  // 全局默认偏好（模板）：无对话时生效，也是新对话的初始来源
+  const [defaultPreferences, setDefaultPreferences] =
     React.useState<AppPreferences>(DEFAULT_PREFERENCES);
   const [configs, setConfigs] = React.useState<AIConfig[]>([]);
   const [currentConfigId, setCurrentConfigId] = React.useState<string | null>(
@@ -96,9 +97,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const loadedConfigs = loadConfigs();
     const loadedCurrent = loadCurrentConfigId();
-    const loadedConversations = loadConversations();
+    const loadedPrefs = loadPreferences();
+    // 旧数据迁移：无独立设置的会话填充全局偏好（此后各会话独立演化）
+    const loadedConversations = loadConversations().map((c) =>
+      c.preferences ? c : { ...c, preferences: loadedPrefs }
+    );
 
-    setPreferences(loadPreferences());
+    setDefaultPreferences(loadedPrefs);
     setConfigs(loadedConfigs);
     setCurrentConfigId(
       loadedCurrent && loadedConfigs.some((c) => c.id === loadedCurrent)
@@ -113,23 +118,41 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setHydrated(true);
   }, []);
 
-  // 持久化：偏好设置
+  // 偏好设置：写入当前对话（每个对话独立保存）；无对话时写入全局默认模板
   const updatePreferences = React.useCallback(
     (patch: Partial<AppPreferences>) => {
-      setPreferences((prev) => {
-        const next = { ...prev, ...patch };
-        const res = savePreferences(next);
-        if (!res.ok) {
-          toast({
-            variant: "error",
-            title: "保存失败",
-            description: res.error ?? "无法保存偏好设置",
-          });
-        }
-        return next;
-      });
+      if (currentConversationId) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === currentConversationId
+              ? {
+                  ...c,
+                  preferences: {
+                    ...(c.preferences ?? defaultPreferences),
+                    ...patch,
+                  },
+                  updatedAt: Date.now(),
+                }
+              : c
+          )
+        );
+        schedulePersist();
+      } else {
+        setDefaultPreferences((prev) => {
+          const next = { ...prev, ...patch };
+          const res = savePreferences(next);
+          if (!res.ok) {
+            toast({
+              variant: "error",
+              title: "保存失败",
+              description: res.error ?? "无法保存偏好设置",
+            });
+          }
+          return next;
+        });
+      }
     },
-    []
+    [currentConversationId, defaultPreferences, schedulePersist]
   );
 
   // 持久化：配置
@@ -234,13 +257,24 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     [persistCurrentConfigId]
   );
 
+  const currentConversation =
+    conversations.find((c) => c.id === currentConversationId) ?? null;
+
+  // 当前生效偏好：优先当前对话的独立设置，其次全局默认模板
+  const preferences =
+    currentConversation?.preferences ?? defaultPreferences;
+
   // ------- 会话操作 -------
   const newConversation = React.useCallback(() => {
+    // 新对话继承当前生效的偏好设置（当前对话的独立设置或全局默认）
     const conv: Conversation = {
       id: uid(),
       title: "新对话",
       messages: [],
       configId: currentConfigId ?? undefined,
+      preferences: {
+        ...(currentConversation?.preferences ?? defaultPreferences),
+      },
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -248,7 +282,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     persistConversations(next);
     setCurrentConversationId(conv.id);
     return conv;
-  }, [conversations, currentConfigId, persistConversations]);
+  }, [
+    conversations,
+    currentConfigId,
+    currentConversation,
+    defaultPreferences,
+    persistConversations,
+  ]);
 
   const selectConversation = React.useCallback((id: string) => {
     setCurrentConversationId(id);
@@ -313,8 +353,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const currentConfig =
     configs.find((c) => c.id === currentConfigId) ?? null;
-  const currentConversation =
-    conversations.find((c) => c.id === currentConversationId) ?? null;
 
   const value = React.useMemo<AppState>(
     () => ({

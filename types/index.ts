@@ -64,6 +64,8 @@ export interface Conversation {
   messages: ChatMessage[];
   /** 该会话使用的配置 id（可选，默认用全局当前配置） */
   configId?: string;
+  /** 该会话独立的偏好设置（AI/我的形象、背景、预制 Prompt） */
+  preferences?: AppPreferences;
   createdAt: number;
   updatedAt: number;
 }

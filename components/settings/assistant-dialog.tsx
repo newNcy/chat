@@ -178,7 +178,7 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
         <DialogHeader>
           <DialogTitle>对话设置</DialogTitle>
           <DialogDescription>
-            自定义 AI 与你的形象、聊天背景与预制 Prompt，对所有对话生效。
+            自定义 AI 与你的形象、聊天背景与预制 Prompt，仅对当前对话生效。
           </DialogDescription>
         </DialogHeader>
 
