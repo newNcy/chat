@@ -63,6 +63,10 @@ interface StreamingMarkdownProps {
   sentenceMs?: number;
   /** 打字节奏：段落（换行）停顿毫秒（默认 200） */
   paragraphMs?: number;
+  /** 冻结动画令牌：数值递增时立即停止逐字显示（保留当前已显示部分） */
+  freezeToken?: number;
+  /** 打字动画状态汇报（进行中/结束） */
+  onTypingStateChange?: (typing: boolean) => void;
 }
 
 /**
@@ -78,6 +82,8 @@ export function StreamingMarkdown({
   charMs = 70,
   sentenceMs = 200,
   paragraphMs = 200,
+  freezeToken = 0,
+  onTypingStateChange,
 }: StreamingMarkdownProps) {
   const [visibleCount, setVisibleCount] = React.useState(0);
   const contentRef = React.useRef(content);
@@ -116,10 +122,31 @@ export function StreamingMarkdown({
     setVisibleCount(0);
   }, [stopTypeLoop]);
 
+  // 冻结标记：停止逐字显示，保留当前已显示部分
+  const [frozen, setFrozen] = React.useState(false);
+
   React.useEffect(() => {
     resetProgress();
+    setFrozen(false);
     prevContentRef.current = "";
   }, [messageId, resetProgress]);
+
+  // 冻结动画：令牌递增时停止逐字显现（内容保留已显示部分）
+  React.useEffect(() => {
+    if (freezeToken > 0) {
+      stopTypeLoop();
+      setFrozen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freezeToken]);
+
+  // 打字动画状态汇报（供外部把停止按钮保持为激活态）
+  const typingActive =
+    !frozen && content.length > 0 && visibleCount < content.length;
+  React.useEffect(() => {
+    onTypingStateChange?.(typingActive);
+    return () => onTypingStateChange?.(false);
+  }, [typingActive, onTypingStateChange]);
 
   React.useEffect(() => {
     const prev = prevContentRef.current;
@@ -127,6 +154,8 @@ export function StreamingMarkdown({
 
     if (content.length === 0) {
       resetProgress();
+      // 内容被清空（如重新生成）：解除冻结，恢复打字
+      setFrozen(false);
       return;
     }
 
@@ -150,6 +179,9 @@ export function StreamingMarkdown({
 
   // 逐字动画：只显示已提交的完整句子，未完成的半句继续缓冲
   React.useEffect(() => {
+    // 冻结中：不启动打字循环
+    if (frozen) return;
+
     const tick = (now: number) => {
       if (now < pausedUntilRef.current) {
         rafRef.current = requestAnimationFrame(tick);
@@ -216,7 +248,15 @@ export function StreamingMarkdown({
         rafRef.current = null;
       }
     };
-  }, [content, streaming, onReveal, charMs, sentenceMs, paragraphMs]);
+  }, [
+    content,
+    streaming,
+    onReveal,
+    charMs,
+    sentenceMs,
+    paragraphMs,
+    frozen,
+  ]);
 
   React.useLayoutEffect(() => {
     if (visibleCount < content.length || streaming) onReveal?.();

@@ -37,6 +37,10 @@ export function Chat({ onOpenSettings }: ChatProps) {
   } = useAppStore();
 
   const [streaming, setStreaming] = React.useState(false);
+  // 逐字动画进行中（流式可能已结束，但打字动画仍在追）
+  const [typingActive, setTypingActive] = React.useState(false);
+  // 冻结逐字动画令牌
+  const [freezeAnimToken, setFreezeAnimToken] = React.useState(0);
   const abortRef = React.useRef<AbortController | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
@@ -479,8 +483,13 @@ export function Chat({ onOpenSettings }: ChatProps) {
   );
 
   const handleStop = React.useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+    // 网络流进行中：中断请求（已接收内容保留）
+    if (streaming) {
+      abortRef.current?.abort();
+    }
+    // 无论流是否结束，冻结逐字显示（停在当前已显示部分）
+    setFreezeAnimToken((t) => t + 1);
+  }, [streaming]);
 
   const handleRegenerate = React.useCallback(() => {
     if (!currentConfig || !currentConversation) return;
@@ -641,6 +650,12 @@ export function Chat({ onOpenSettings }: ChatProps) {
                 onStreamScroll={
                   msg.id === lastAssistantId ? pinScrollToBottom : undefined
                 }
+                skipAnimToken={
+                  msg.id === lastAssistantId ? freezeAnimToken : undefined
+                }
+                onTypingStateChange={
+                  msg.id === lastAssistantId ? setTypingActive : undefined
+                }
               />
             );
             })}
@@ -652,11 +667,11 @@ export function Chat({ onOpenSettings }: ChatProps) {
         )}
       </div>
 
-      {/* 输入区 */}
+      {/* 输入区：流式或逐字动画进行中均显示停止按钮 */}
       <ChatInput
         onSend={handleSend}
         onStop={handleStop}
-        streaming={streaming}
+        streaming={streaming || typingActive}
         disabled={!hydrated || !hasConfig}
         toolbar={<ModelSelector onOpenSettings={onOpenSettings} />}
       />

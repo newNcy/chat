@@ -24,6 +24,10 @@ interface MessageItemProps {
   onNextVariant?: () => void;
   /** 流式文字显现时跟随滚动 */
   onStreamScroll?: () => void;
+  /** 冻结打字动画令牌（停止逐字显示） */
+  skipAnimToken?: number;
+  /** 打字动画状态汇报 */
+  onTypingStateChange?: (typing: boolean) => void;
 }
 
 export const MessageItem = React.memo(function MessageItem({
@@ -36,6 +40,8 @@ export const MessageItem = React.memo(function MessageItem({
   onPrevVariant,
   onNextVariant,
   onStreamScroll,
+  skipAnimToken,
+  onTypingStateChange,
 }: MessageItemProps) {
   const [copied, setCopied] = React.useState(false);
   const { preferences } = useAppStore();
@@ -130,6 +136,8 @@ export const MessageItem = React.memo(function MessageItem({
                   charMs={preferences.typingCharMs}
                   sentenceMs={preferences.typingSentenceMs}
                   paragraphMs={preferences.typingParagraphMs}
+                  freezeToken={skipAnimToken}
+                  onTypingStateChange={onTypingStateChange}
                 />
               </div>
             ) : streaming || message.pending ? (
