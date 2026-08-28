@@ -127,6 +127,9 @@ export const MessageItem = React.memo(function MessageItem({
                   streaming={!!streaming}
                   messageId={message.id}
                   onReveal={onStreamScroll}
+                  charMs={preferences.typingCharMs}
+                  sentenceMs={preferences.typingSentenceMs}
+                  paragraphMs={preferences.typingParagraphMs}
                 />
               </div>
             ) : streaming || message.pending ? (

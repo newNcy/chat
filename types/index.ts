@@ -30,6 +30,12 @@ export interface AppPreferences {
   chatBackground?: string;
   /** 聊天背景显示强度 0-100，数值越高背景越明显 */
   chatBackgroundOpacity?: number;
+  /** 打字节奏：字间隔（毫秒，默认 70） */
+  typingCharMs?: number;
+  /** 打字节奏：句子/标点停顿（毫秒，默认 200） */
+  typingSentenceMs?: number;
+  /** 打字节奏：段落（换行）停顿（毫秒，默认 200） */
+  typingParagraphMs?: number;
   /** 预制 Prompt（system prompt），随每次聊天请求发送 */
   systemPrompt: string;
 }

@@ -375,6 +375,82 @@ export function AssistantDialog({ open, onOpenChange }: AssistantDialogProps) {
               </p>
             </div>
           </div>
+
+          {/* 打字节奏 */}
+          <div className="border-t pt-4">
+            <div className="space-y-3">
+              <div>
+                <Label>打字节奏</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  控制 AI 回复的逐字显现速度，即时生效。
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-xs text-muted-foreground">
+                  字间隔
+                </span>
+                <input
+                  type="range"
+                  min={10}
+                  max={300}
+                  step={5}
+                  value={preferences.typingCharMs ?? 70}
+                  onChange={(e) =>
+                    updatePreferences({ typingCharMs: Number(e.target.value) })
+                  }
+                  className="h-1.5 flex-1 cursor-pointer accent-primary"
+                  aria-label="字间隔"
+                />
+                <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {preferences.typingCharMs ?? 70}ms
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-xs text-muted-foreground">
+                  句子间隔
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1500}
+                  step={10}
+                  value={preferences.typingSentenceMs ?? 200}
+                  onChange={(e) =>
+                    updatePreferences({
+                      typingSentenceMs: Number(e.target.value),
+                    })
+                  }
+                  className="h-1.5 flex-1 cursor-pointer accent-primary"
+                  aria-label="句子间隔"
+                />
+                <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {preferences.typingSentenceMs ?? 200}ms
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-xs text-muted-foreground">
+                  段落间隔
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={2000}
+                  step={10}
+                  value={preferences.typingParagraphMs ?? 200}
+                  onChange={(e) =>
+                    updatePreferences({
+                      typingParagraphMs: Number(e.target.value),
+                    })
+                  }
+                  className="h-1.5 flex-1 cursor-pointer accent-primary"
+                  aria-label="段落间隔"
+                />
+                <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {preferences.typingParagraphMs ?? 200}ms
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>

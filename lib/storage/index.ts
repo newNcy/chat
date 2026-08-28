@@ -108,8 +108,22 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   userCustomAvatar: "",
   chatBackground: "",
   chatBackgroundOpacity: 20,
+  typingCharMs: 70,
+  typingSentenceMs: 200,
+  typingParagraphMs: 200,
   systemPrompt: "",
 };
+
+/** 数值字段安全解析（带范围约束） */
+function clampNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
 
 export function loadPreferences(): AppPreferences {
   const p = readJSON<Partial<AppPreferences>>(
@@ -140,6 +154,24 @@ export function loadPreferences(): AppPreferences {
       typeof p.userCustomAvatar === "string" ? p.userCustomAvatar : "",
     chatBackground: typeof p.chatBackground === "string" ? p.chatBackground : "",
     chatBackgroundOpacity: opacity,
+    typingCharMs: clampNumber(
+      p.typingCharMs,
+      DEFAULT_PREFERENCES.typingCharMs!,
+      10,
+      300
+    ),
+    typingSentenceMs: clampNumber(
+      p.typingSentenceMs,
+      DEFAULT_PREFERENCES.typingSentenceMs!,
+      0,
+      1500
+    ),
+    typingParagraphMs: clampNumber(
+      p.typingParagraphMs,
+      DEFAULT_PREFERENCES.typingParagraphMs!,
+      0,
+      2000
+    ),
     systemPrompt:
       typeof p.systemPrompt === "string" ? p.systemPrompt : "",
   };

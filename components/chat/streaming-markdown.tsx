@@ -5,20 +5,20 @@ import { Markdown } from "@/components/chat/markdown";
 import { LoadingDots } from "@/components/chat/loading-dots";
 import { balanceMarkdown } from "@/lib/utils/markdown-balance";
 
-const CHARS_PER_SECOND = 1000 / 70; // 每字间隔 70ms
-/** 标点后停顿 */
-const PUNCT_PAUSE_MS = 200;
-
 /** 中英文常见标点 */
 const PUNCT_RE = /[，。！？、；：,.!?;:…—～~]/;
 
-/** 标点后停顿 */
-function getPauseAfter(text: string, index: number): number {
-  if (index > 0 && PUNCT_RE.test(text[index - 1])) {
-    return PUNCT_PAUSE_MS;
-  }
-  if (index > 0 && text[index - 1] === "\n") {
-    return PUNCT_PAUSE_MS;
+/** 句子（标点）/段落（换行）后的停顿时长 */
+function getPauseAfter(
+  text: string,
+  index: number,
+  sentenceMs: number,
+  paragraphMs: number
+): number {
+  if (index > 0) {
+    const prev = text[index - 1];
+    if (prev === "\n") return paragraphMs;
+    if (PUNCT_RE.test(prev)) return sentenceMs;
   }
   return 0;
 }
@@ -57,6 +57,12 @@ interface StreamingMarkdownProps {
   streaming: boolean;
   messageId: string;
   onReveal?: () => void;
+  /** 打字节奏：字间隔毫秒（默认 70） */
+  charMs?: number;
+  /** 打字节奏：句子/标点停顿毫秒（默认 200） */
+  sentenceMs?: number;
+  /** 打字节奏：段落（换行）停顿毫秒（默认 200） */
+  paragraphMs?: number;
 }
 
 /**
@@ -69,6 +75,9 @@ export function StreamingMarkdown({
   streaming,
   messageId,
   onReveal,
+  charMs = 70,
+  sentenceMs = 200,
+  paragraphMs = 200,
 }: StreamingMarkdownProps) {
   const [visibleCount, setVisibleCount] = React.useState(0);
   const contentRef = React.useRef(content);
@@ -165,7 +174,7 @@ export function StreamingMarkdown({
         return;
       }
 
-      charBudgetRef.current += (CHARS_PER_SECOND * elapsed) / 1000;
+      charBudgetRef.current += elapsed / charMs;
       const step = Math.floor(charBudgetRef.current);
       if (step < 1) {
         rafRef.current = requestAnimationFrame(tick);
@@ -181,7 +190,10 @@ export function StreamingMarkdown({
 
       let pauseMs = 0;
       for (let i = prevCount + 1; i <= newCount; i++) {
-        pauseMs = Math.max(pauseMs, getPauseAfter(text, i));
+        pauseMs = Math.max(
+          pauseMs,
+          getPauseAfter(text, i, sentenceMs, paragraphMs)
+        );
       }
       if (pauseMs > 0 && newCount < targetLen) {
         pausedUntilRef.current = now + pauseMs;
@@ -204,7 +216,7 @@ export function StreamingMarkdown({
         rafRef.current = null;
       }
     };
-  }, [content, streaming, onReveal]);
+  }, [content, streaming, onReveal, charMs, sentenceMs, paragraphMs]);
 
   React.useLayoutEffect(() => {
     if (visibleCount < content.length || streaming) onReveal?.();
