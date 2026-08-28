@@ -182,6 +182,8 @@ export function Chat({ onOpenSettings }: ChatProps) {
       let assistantId: string;
       let working: ChatMessage[];
       let apiBaseMessages: ChatMessage[];
+      // 新一轮生成开始：重置冻结令牌（避免旧令牌把新消息立即冻结成空白）
+      setFreezeAnimToken(0);
       let regenerateSnapshot: {
         variants?: MessageVariant[];
         activeVariantIndex?: number;
