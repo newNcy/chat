@@ -5,7 +5,7 @@ import { Markdown } from "@/components/chat/markdown";
 import { LoadingDots } from "@/components/chat/loading-dots";
 import { balanceMarkdown } from "@/lib/utils/markdown-balance";
 
-const CHARS_PER_SECOND = 12.5; // 每字间隔 80ms
+const CHARS_PER_SECOND = 1000 / 70; // 每字间隔 70ms
 /** 标点后停顿 */
 const PUNCT_PAUSE_MS = 200;
 
