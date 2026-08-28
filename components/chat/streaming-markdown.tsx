@@ -32,7 +32,6 @@ function getCommittedLength(text: string, commitAll: boolean): number {
   if (commitAll) return text.length;
 
   let committed = 0;
-  let sinceCommit = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (PUNCT_RE.test(ch) || ch === "\n") {
@@ -46,15 +45,7 @@ function getCommittedLength(text: string, commitAll: boolean): number {
         end++;
       }
       committed = end;
-      sinceCommit = 0;
       i = end - 1;
-    } else {
-      sinceCommit++;
-      // 长时间无标点（代码块/长URL等）：超过 40 字符强制提交，避免一直空白
-      if (sinceCommit >= 40) {
-        committed = i + 1;
-        sinceCommit = 0;
-      }
     }
   }
 
