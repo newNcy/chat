@@ -103,7 +103,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     // 旧数据迁移：无独立设置的会话填充出厂默认（此后各会话独立演化）
     const loadedConversations = loadConversations().map((c) =>
       c.preferences ? c : { ...c, preferences: { ...DEFAULT_PREFERENCES } }
-    );
+    ).map((c) => ({
+      ...c,
+      // 清理刷新页面残留的生成中标记（流式时刷新会存下 pending 快照）
+      messages: c.messages.map((m) =>
+        m.pending ? { ...m, pending: false } : m
+      ),
+    }));
 
     setConfigs(loadedConfigs);
     setCurrentConfigId(

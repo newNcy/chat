@@ -23,7 +23,16 @@ export function toApiMessages(
 
   result.push(
     ...messages
-      .filter((m) => !m.error) // 跳过错误占位消息
+      .filter(
+        (m) =>
+          // 跳过错误占位消息
+          !m.error &&
+          // 跳过生成中的占位消息（含刷新页面后的 pending 残留）
+          !m.pending &&
+          // 跳过空内容消息（生成中断残留），用户空文本+图片的消息除外
+          (m.content.trim().length > 0 ||
+            (m.role === "user" && (m.images?.length ?? 0) > 0))
+      )
       .map((m) => {
         // 带图片的 user 消息 -> 多模态 content
         if (m.role === "user" && m.images && m.images.length > 0) {
