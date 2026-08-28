@@ -3,10 +3,9 @@
 import * as React from "react";
 import { Markdown } from "@/components/chat/markdown";
 import { LoadingDots } from "@/components/chat/loading-dots";
+import { balanceMarkdown } from "@/lib/utils/markdown-balance";
 
 const CHARS_PER_SECOND = 12.5; // 每字间隔 80ms
-/** 单字从透明到不透明的时长 */
-const CHAR_FADE_MS = 240;
 /** 标点后停顿 */
 const PUNCT_PAUSE_MS = 200;
 
@@ -60,6 +59,11 @@ interface StreamingMarkdownProps {
   onReveal?: () => void;
 }
 
+/**
+ * 流式 Markdown：打字过程中实时渲染 Markdown。
+ * 未闭合的标记（**、`、~~、``` 等）自动补全闭合，
+ * 全程呈现渲染后的样式；完成后用原文渲染。
+ */
 export function StreamingMarkdown({
   content,
   streaming,
@@ -67,17 +71,14 @@ export function StreamingMarkdown({
   onReveal,
 }: StreamingMarkdownProps) {
   const [visibleCount, setVisibleCount] = React.useState(0);
-  const [, setFadePulse] = React.useState(0);
   const contentRef = React.useRef(content);
   const prevContentRef = React.useRef(content);
   const countRef = React.useRef(0);
   const committedRef = React.useRef(0);
   const rafRef = React.useRef<number | null>(null);
-  const fadeRafRef = React.useRef<number | null>(null);
   const lastTimeRef = React.useRef<number | null>(null);
   const pausedUntilRef = React.useRef(0);
   const charBudgetRef = React.useRef(0);
-  const revealedAtRef = React.useRef<Map<number, number>>(new Map());
 
   contentRef.current = content;
   committedRef.current = getCommittedLength(content, !streaming);
@@ -92,68 +93,19 @@ export function StreamingMarkdown({
     charBudgetRef.current = 0;
   }, []);
 
-  const stopFadeLoop = React.useCallback(() => {
-    if (fadeRafRef.current !== null) {
-      cancelAnimationFrame(fadeRafRef.current);
-      fadeRafRef.current = null;
-    }
-  }, []);
-
-  const startFadeLoop = React.useCallback(() => {
-    if (fadeRafRef.current !== null) return;
-
-    const loop = (now: number) => {
-      let needs = false;
-      for (const t of revealedAtRef.current.values()) {
-        if (now - t < CHAR_FADE_MS) {
-          needs = true;
-          break;
-        }
-      }
-      if (needs) {
-        setFadePulse((p) => p + 1);
-        fadeRafRef.current = requestAnimationFrame(loop);
-      } else {
-        fadeRafRef.current = null;
-      }
-    };
-
-    fadeRafRef.current = requestAnimationFrame(loop);
-  }, []);
-
-  const markRevealed = React.useCallback(
-    (from: number, to: number, now: number) => {
-      for (let i = from; i < to; i++) {
-        if (!revealedAtRef.current.has(i)) {
-          revealedAtRef.current.set(i, now);
-        }
-      }
-      startFadeLoop();
-    },
-    [startFadeLoop]
-  );
-
   const showFull = React.useCallback(() => {
     stopTypeLoop();
-    stopFadeLoop();
     const len = contentRef.current.length;
-    const now = performance.now();
-    for (let i = 0; i < len; i++) {
-      revealedAtRef.current.set(i, now - CHAR_FADE_MS);
-    }
     countRef.current = len;
-    committedRef.current = len;
     setVisibleCount(len);
-  }, [stopTypeLoop, stopFadeLoop]);
+  }, [stopTypeLoop]);
 
   const resetProgress = React.useCallback(() => {
     stopTypeLoop();
-    stopFadeLoop();
-    revealedAtRef.current.clear();
     countRef.current = 0;
     committedRef.current = 0;
     setVisibleCount(0);
-  }, [stopTypeLoop, stopFadeLoop]);
+  }, [stopTypeLoop]);
 
   React.useEffect(() => {
     resetProgress();
@@ -175,11 +127,13 @@ export function StreamingMarkdown({
       content.startsWith(revealed) ||
       content.startsWith(prev);
 
+    // 内容被整体替换（如切换变体）且非流式：直接全显
     if (!streaming && !isAppend) {
       showFull();
       return;
     }
 
+    // 历史消息（非流式且从未开始打字）：直接全显
     if (!streaming && countRef.current === 0 && !prev) {
       showFull();
     }
@@ -201,7 +155,6 @@ export function StreamingMarkdown({
       const targetLen = committedRef.current;
 
       if (countRef.current >= targetLen) {
-        // 还有未提交缓冲时继续等下一帧（新句子到达后继续打）
         if (targetLen < text.length || countRef.current < text.length) {
           rafRef.current = requestAnimationFrame(tick);
           return;
@@ -223,7 +176,6 @@ export function StreamingMarkdown({
       const prevCount = countRef.current;
       const newCount = Math.min(targetLen, countRef.current + step);
       countRef.current = newCount;
-      markRevealed(prevCount, newCount, now);
       setVisibleCount(newCount);
       onReveal?.();
 
@@ -252,31 +204,15 @@ export function StreamingMarkdown({
         rafRef.current = null;
       }
     };
-  }, [content, streaming, visibleCount, onReveal, markRevealed]);
-
-  const isFullyRevealed =
-    !streaming && visibleCount >= content.length && content.length > 0;
-  const visibleText = content.slice(0, visibleCount);
-  const now = performance.now();
-
-  const allFadesDone = React.useMemo(() => {
-    if (!isFullyRevealed) return false;
-    for (let i = 0; i < visibleCount; i++) {
-      const t = revealedAtRef.current.get(i);
-      if (t !== undefined && now - t < CHAR_FADE_MS) return false;
-    }
-    return true;
-  }, [isFullyRevealed, visibleCount, now]);
+  }, [content, streaming, onReveal]);
 
   React.useLayoutEffect(() => {
     if (visibleCount < content.length || streaming) onReveal?.();
   }, [visibleCount, content.length, streaming, onReveal]);
 
-  React.useEffect(() => {
-    if (allFadesDone) stopFadeLoop();
-  }, [allFadesDone, stopFadeLoop]);
+  if (!content && visibleCount === 0) return null;
 
-  if (!content && !visibleText) return null;
+  const visibleText = content.slice(0, visibleCount);
 
   if (!visibleText) {
     return streaming ? (
@@ -286,23 +222,10 @@ export function StreamingMarkdown({
     ) : null;
   }
 
-  // 打字过程中始终用同一套逐字布局，避免 Markdown/纯文本切换导致「先出再右移」
-  // 全部显现且淡入结束后再切到完整 Markdown
-  if (allFadesDone) {
-    return <Markdown content={content} />;
-  }
+  // 打字过程中：实时 Markdown 渲染（未闭合标记自动补全，全程渲染后样式）
+  // 完成后：完整原文渲染
+  const displayText =
+    visibleCount < content.length ? balanceMarkdown(visibleText) : content;
 
-  return (
-    <div className="markdown-body text-sm leading-5 break-words whitespace-pre-wrap text-foreground">
-      {visibleText.split("").map((ch, idx) => {
-        const revealed = revealedAtRef.current.get(idx) ?? now;
-        const opacity = Math.min(1, Math.max(0, (now - revealed) / CHAR_FADE_MS));
-        return (
-          <span key={idx} style={{ opacity }}>
-            {ch}
-          </span>
-        );
-      })}
-    </div>
-  );
+  return <Markdown content={displayText} />;
 }
